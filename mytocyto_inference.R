@@ -24,12 +24,6 @@ pts = unique(mc_data$patient_id)
 mitochan = "VDAC"
 channels = c("CYB","NDUFB8","MTCO1")
 
-# burn-in, chain length, thinning lag
-MCMCBurnin = 1000
-MCMCOutput = 5000 + MCMCBurnin
-MCMCThin = 1
-n.chains = 1
-
 # model string
 {
   modelstring = "
@@ -84,7 +78,6 @@ inference = function(input){
     Npat = nrow(XY_pat)
     
     mu1_mean = colMeans(XY_ctrl)
-    print(mu1_mean)
     mu2_mean = mu1_mean
     mu1_prec = solve( matrix(c(0.1, 0.169, 0.169, 0.3), ncol=2, nrow=2, byrow=TRUE) ) # correlation of ~95.0%
     mu2_prec = 0.1*diag(2) 
@@ -143,6 +136,12 @@ inference = function(input){
                  "classifs_post"=classifs_post) )
   })
 }
+
+# burn-in, chain length, thinning lag
+MCMCBurnin = 1000
+MCMCOutput = 5000 + MCMCBurnin
+MCMCThin = 1
+n.chains = 1
 
 input_basics = list("mitochan"=mitochan, "raw_data"=mc_data,
                     "MCMCBurnin"=MCMCBurnin, "MCMCOutput"=MCMCOutput, 
