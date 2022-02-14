@@ -21,24 +21,6 @@ mc_data[mc_df[,"patient_id"] %in% pts_df[grep("C0", pts_df)],"patient_id"] = "co
 
 pts = unique(mc_data$patient_id)
 
-for(chan in channels){
-  par(mfrow=c(1,2))
-  xmax = max(log(mc_data[,"VDAC"]))
-  ymax = max(log(mc_data[,paste(chan)]))
-  
-  cntrl_data = mc_data[mc_data$patient_id=="control",]
-  plot(log(cntrl_data[,"VDAC"]), log(cntrl_data[,paste(chan)]), pch=20, col=myBlack(0.3), 
-       xlim=c(0,xmax), ylim=c(0,ymax),
-       xlab="log(VDAC)", ylab=paste0("log(",chan,")"), cex.axis=1.1, cex.lab=1.2, cex.main=1.4,
-       main=paste("Control Data") )
-  
-  pat_data = mc_data[mc_data$patient_id!="control",]
-  plot(log(pat_data[,"VDAC"]), log(pat_data[,paste(chan)]), pch=20, col=myBlack(0.3), 
-       xlim=c(0,xmax), ylim=c(0,ymax),
-       xlab="log(VDAC)", ylab=paste0("log(",chan,")"), cex.axis=1.1, cex.lab=1.2, cex.main=1.4,
-       main=paste("Patient Data") )
-}
-
 mitochan = "VDAC"
 channels = c("CYB","NDUFB8","MTCO1")
 
@@ -161,10 +143,6 @@ inference = function(input){
                  "classifs_post"=classifs_post) )
   })
 }
-
-tt = inference(list("chan"="CYB", "pat"=pts[1], "mitochan"=mitochan, "raw_data"=mc_data,
-                    "MCMCBurnin"=MCMCBurnin,
-                    "MCMCOutput"=MCMCOutput, "MCMCThin"=MCMCThin, "n.chains"=n.chains))
 
 input_basics = list("mitochan"=mitochan, "raw_data"=mc_data,
                     "MCMCBurnin"=MCMCBurnin, "MCMCOutput"=MCMCOutput, 
