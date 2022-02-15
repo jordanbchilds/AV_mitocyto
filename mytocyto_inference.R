@@ -54,7 +54,7 @@ model {
   
   zpred ~ dbern(probdiff_pat)
   compred = 2 - zpred
-  Ypred ~ dmnorm(mu[,compred], tau[,,compred])
+  Ypred[1:2] ~ dmnorm(mu[,compred], tau[,,compred])
 }
 "
 }
