@@ -166,30 +166,29 @@ inference = function(input){
     classifs_pat = summ_pat$statistics[grepl("class",rownames(summ_pat$statistics)),"Mean"]
     
     posterior_ctrl_names = colnames(posterior_ctrl)
-    post_ctrl = posterior_ctrl[,!(grepl("class", posterior_ctrl_names)|grepl("Ysyn", posterior_ctrl_names))]
-    
+    post_ctrl = posterior_ctrl[,c("m", "c", "tau", "probduff")]
     postpred_ctrl = colQuantiles( posterior_ctrl[,grepl("Ysyn", posterior_ctrl_names)], probs=c(0.025, 0.5, 0.975) )
     
     prior_ctrl_names = colnames(prior_ctrl)
     priorpred_ctrl = colQuantiles(prior_ctrl[, grepl("Ysyn", prior_ctrl_names)], probs=c(0.025,0.5,0.975))
-    prior_control = prior_ctrl[,!grepl("Ysyn", prior_ctrl_names)]
+    prior_control = prior_ctrl[,c("m", "c", "tau", "probduff")]
     
     posterior_pat_names = colnames(posterior_pat)
-    post_pat = posterior_pat[,!(grepl("class", posterior_pat_names)|grepl("Ysyn",posterior_pat_names))]
+    post_pat = posterior_pat[,c("m", "c", "tau", "probduff")]
     postpred_pat = colQuantiles(posterior_pat[,grepl("Ysyn", posterior_pat_names)], probs=c(0.025,0.5,0.975))
     
     prior_pat_names = colnames(prior_pat)
     priorpred_pat = colQuantiles(prior_pat[,grepl("Ysyn", prior_pat_names)], probs=c(0.025,0.5,0.975))
-    prior_patient = prior_pat[,!grepl("Ysyn",prior_pat_names)]
+    prior_patient = prior_pat[,c("m", "c", "tau", "probduff")]
     
-    ctrl_inference = list(post=post_ctrl, postpred=postpred_ctrl, 
-                          prior=prior_control, priorpred=priorpred_ctrl,
-                          classif=classifs_ctrl)
-    pat_inference = list(post=posterior_pat, postpred=postpred_pat,
-                         prior=prior_patient, priorpred=priorpred_pat,
-                         classif=classifs_pat)
+    ctrl_list = list(post=post_ctrl, postpred=postpred_ctrl, 
+                     prior=prior_control, priorpred=priorpred_ctrl,
+                     classif=classifs_ctrl)
+    pat_list = list(post=post_pat, postpred=postpred_pat,
+                    prior=prior_patient, priorpred=priorpred_pat,
+                    classif=classifs_pat)
     
-    return( list(ctrl=ctrl_inference, pat=pat_inference) )
+    return( list(ctrl=ctrl_list, pat=pat_list) )
   })
 }
 
@@ -220,6 +219,8 @@ inputs = list()
     } # pts
   } # chans
 }
+
+inference(inputs[[1]])
 
 ncores = 12
 cl  = makeCluster(ncores) 
