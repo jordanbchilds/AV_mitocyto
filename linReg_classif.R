@@ -208,7 +208,7 @@ channels = c("MTCO1", "NDUFB8", "CYB")
 inputs = list()
 {
   input0 = list()
-  input0$MCMCOut = 10000
+  input0$MCMCOut = 2000
   input0$MCMCBurnin = 2000
   input0$MCMCThin = 1
   input0$n.chains = 1
