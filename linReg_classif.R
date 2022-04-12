@@ -5,21 +5,21 @@ library(parallel)
 modelstring = "
  model {
   # Likelihood of data given model parameters
-  for (i in 1:N){
+  for(i in 1:N){
    class[i] ~ dbern(probdiff)
    Yobs[i] ~ dnorm(Y[i],tau_hat[i])
    Y[i] = m*Xobs[i] + c
    tau_hat[i] = ifelse(class[i]==0, tau, 0.01)
   }
-  for (j in 1:Nsyn){
-   Ysyn[j]~dnorm(Ys[j], tau)
+  for(j in 1:Nsyn){
+   Ysyn[j] ~ dnorm(Ys[j], tau)
    Ys[j] <- m*Xsyn[j] + c
   }
   # Specify prior beliefs about parameters
-  m~dnorm(mu_m,tau_m)
-  c~dnorm(mu_c,tau_c)
-  tau~dgamma(shape_tau,rate_tau)
-  probdiff~dbeta(alpha,beta)  
+  m ~ dnorm(mu_m,tau_m)
+  c ~ dnorm(mu_c,tau_c)
+  tau ~ dgamma(shape_tau, rate_tau)
+  probdiff ~ dbeta(alpha,beta)  
  }
 "
 
@@ -88,23 +88,26 @@ inference = function(input){
     Ypat = data_mats$pat
     Nctrl = nrow(Yctrl)
     Npat = nrow(Ypat)
+    
+    Xsyn = seq(0,5, length.out=1000)
   
     # prior parameters for control data
     c_est = 0
     tau_c = 1/2^2
     m_est = 0
     tau_m = 1/2^2
-    tau_err_shape = 3
-    tau_err_rate = 1
-    tau_err_mode = (tau_err_shape-1)/tau_err_rate
+    tau_shape = 3
+    tau_rate = 1
     N_syn = 1000
+    alpha = 1
+    beta = 1
     
     ## control inference
     data_ctrl = list( Xobs=Yctrl[,1], Yobs=Yctrl[,2], N=Nctrl, Nsyn=N_syn,
-                      Xsyn=seq(0.9*min(Yctrl[,1]), 1.1*max(Yctrl[,1]),length.out=N_syn),
+                      Xsyn=seq(min(Yctrl[,1])-1, max(Yctrl[,1])+1,length.out=N_syn),
                       mu_m=m_est, tau_m=tau_m, mu_c=c_est, tau_c=tau_c,
-                      shape_tau=tau_err_shape, rate_tau=tau_err_rate,
-                      alpha=1.0, beta=1.0)
+                      shape_tau=tau_shape, rate_tau=tau_rate,
+                      alpha=alpha, beta=beta)
     
     data_ctrl_priorpred = data_ctrl
     data_ctrl_priorpred$Yobs = NULL
@@ -112,16 +115,14 @@ inference = function(input){
     
     model_ctrl = jags.model(textConnection(modelstring), data=data_ctrl, n.chains=n.chains)
     model_ctrl_priorpred = jags.model(textConnection(modelstring), data=data_ctrl_priorpred)
-    
     update(model_ctrl,n.iter=MCMCBurnin)
     output_ctrl = coda.samples(model=model_ctrl, n.iter=MCMCOut*MCMCThin,thin=MCMCThin,
                                variable.names=c("m","c","tau","Ysyn","class","probdiff"))
-    output_ctrl_priorpred = coda.samples(model=model_ctrl_priorpred, n.iter=MCMCOut,thin=1,
+    output_ctrl_prior = coda.samples(model=model_ctrl_priorpred, n.iter=MCMCOut,thin=1,
                                          variable.names=c("m","c","tau","Ysyn","probdiff"))
     
     posterior_ctrl = as.data.frame(output_ctrl[[1]])
-    prior_ctrl = as.data.frame(output_ctrl_priorpred[[1]])
-
+    prior_ctrl = as.data.frame(output_ctrl_prior[[1]])
     summ_ctrl = summary(output_ctrl)
     classifs_ctrl = summ_ctrl$statistics[grepl("class",rownames(summ_ctrl$statistics)),"Mean"]
     
@@ -132,19 +133,21 @@ inference = function(input){
     tau_c = flex/(sd(posterior_ctrl$c)^2)
     m_est = mean(posterior_ctrl$m)
     tau_m = flex/(sd(posterior_ctrl$m)^2)
-    delta = 1.5*as.numeric(quantile(posterior_ctrl$tau,0.5)) # Choose this value so that Tiago's replication dataset never predicts over-expression of CI or CIV
-    tau_err_mean = mean(posterior_ctrl$tau) + delta # Precision tau = (1/sd)^2
-    tau_err_sd = sd(posterior_ctrl$tau) # Deviation from prior tau should require a lot of contradictory data
-    tau_err_shape = (tau_err_mean^2)/(tau_err_sd^2)
-    tau_err_rate = tau_err_mean/(tau_err_sd^2)
+    delta = 1.5*as.numeric(quantile(posterior_ctrl$tau, 0.5)) # Choose this value so that Tiago's replication dataset never predicts over-expression of CI or CIV
+    tau_mean = mean(posterior_ctrl$tau) + delta # Precision tau = (1/sd)^2
+    tau_sd = sd(posterior_ctrl$tau) # Deviation from prior tau should require a lot of contradictory data
+    tau_shape = (tau_mean^2)/(tau_sd^2)
+    tau_rate = tau_mean/(tau_sd^2)
     N_syn = 1000
+    alpha = 1
+    beta = 1
     
     data_pat = list( Xobs=Ypat[,1], Yobs=Ypat[,2], N=Npat, Nsyn=N_syn,
-                     Xsyn=seq(0.9*min(Ypat[,1]), 1.1*max(Ypat[,1]), length.out=N_syn),
+                     Xsyn=seq(min(Yctrl[,1])-1, 1.1*max(Yctrl[,1])+1, length.out=N_syn),
                      mu_m=m_est, tau_m=tau_m, 
                      mu_c=c_est, tau_c=tau_c,
-                     shape_tau=tau_err_shape, rate_tau=tau_err_rate, 
-                     alpha=12.5, beta=12.5)
+                     shape_tau=tau_shape, rate_tau=tau_rate, 
+                     alpha=alpha, beta=beta)
     
     data_pat_priorpred = data_pat
     data_pat_priorpred$Yobs = NULL
@@ -219,8 +222,6 @@ inputs = list()
     } # pts
   } # chans
 }
-
-inference(inputs[[1]])
 
 ncores = 12
 cl  = makeCluster(ncores) 
