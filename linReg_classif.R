@@ -224,7 +224,7 @@ inputs = list()
 ncores = 12
 cl  = makeCluster(ncores) 
 {
-  clusterExport(cl, c("getData_mats", "modelstring"))
+  clusterExport(cl, c("getData_mats", "modelstring", "colQuantiles"))
   clusterEvalQ(cl, {
     library("rjags")
   })
