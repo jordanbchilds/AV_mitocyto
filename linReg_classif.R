@@ -26,33 +26,66 @@ modelstring = "
 dir.create(file.path("./Output"), showWarnings = FALSE)
 dir.create(file.path("./Output/linReg_classif"), showWarnings = FALSE)
 
-getData_mats = function(fulldat="Data_prepped.csv", mitochan="VDAC", chan, pat){
+getData_mats = function(fulldat="Data_prepped.csv", mitochan="VDAC", chan, 
+                        pts=NULL, ctrl_only=FALSE){
   data_raw = read.csv(fulldat, header=TRUE)
-
+  
   pts_raw = unique(data_raw$patient_id)
-
+  
   data = data_raw
   data[data[,"patient_id"] %in% pts_raw[grep("C0", pts_raw)],"patient_id"] = "control"
-
+  pts_all = unique(data_raw$patient_id)
+  
   ctrl_data = data[data$patient_id=="control", ]
   Xctrl = log(ctrl_data[[mitochan]])
   Yctrl = log(ctrl_data[[chan]])
   XY_ctrl = cbind( Xctrl, Yctrl )
   
-  pat_data = data[data$patient_id==pat,]
-  Xpat = log(pat_data[[mitochan]])
-  Ypat = log(pat_data[[chan]])
-  XY_pat = cbind(Xpat, Ypat)
+  if(!ctrl_only){
+    if(is.null(pts)){
+      Ypat_all = matrix(NA, nrow=1, ncol=2)
+      Npats = vector("numeric")
+      for(pat in pts_all[grepl("P", pts_all)]){
+        pat_data = data[data$patient_id==pat,]
+        Xpat = log(pat_data[[mitochan]])
+        Ypat = log(pat_data[[chan]])
+        XY_pat = cbind(Xpat, Ypat)
+        Ypat_all = rbind(Ypat_all, XY_pat)
+        Npats[pat] = nrow(XY_pat)
+      }
+    } else {
+      Ypat_all = matrix(NA, nrow=1, ncol=2)
+      Npats = vector("numeric")
+      for(pat in pts){
+        pat_data = data[data$patient_id==pat,]
+        Xpat = log(pat_data[[mitochan]])
+        Ypat = log(pat_data[[chan]])
+        XY_pat = cbind(Xpat, Ypat)
+        Ypat_all = rbind(Ypat_all, XY_pat)
+        Npats[pat] = nrow(XY_pat)
+      }
+    }
+  }
   
-  return(list(Yctrl=XY_ctrl, Ypat=XY_pat))
+  if(ctrl_only) return(XY_ctrl)
+  return(list(ctrl=XY_ctrl, pat=Ypat_all[-1,], Npats=Npats))
+}
+
+colQuantiles = function(x, probs=0.5){
+  quants = matrix(NA, nrow=ncol(x), ncol=length(probs))
+  for(i in 1:ncol(x)){
+    quants[i,] = quantile(x[,i], probs)
+  }
+  colnames(quants) = probs
+  return(quants)
 }
 
 # inferenecce 
 inference = function(input){
   with(c(input),{
-    data_mats = getData_mats(chan=chan, pat=pat)
-    Yctrl = data_mats$Yctrl
-    Ypat = data_mats$Ypat
+    data_mats = getData_mats(chan=chan, pts=pat)
+    Yctrl = data_mats$ctrl
+    Ypat = data_mats$pat
     Nctrl = nrow(Yctrl)
     Npat = nrow(Ypat)
   
@@ -134,18 +167,19 @@ inference = function(input){
     
     posterior_ctrl_names = colnames(posterior_ctrl)
     post_ctrl = posterior_ctrl[,!(grepl("class", posterior_ctrl_names)|grepl("Ysyn", posterior_ctrl_names))]
-    postpred_ctrl = posterior_ctrl[,grepl("Ysyn", posterior_ctrl_names)]
+    
+    postpred_ctrl = colQuantiles( posterior_ctrl[,grepl("Ysyn", posterior_ctrl_names)], probs=c(0.025, 0.5, 0.975) )
     
     prior_ctrl_names = colnames(prior_ctrl)
-    priorpred_ctrl = prior_ctrl[, grepl("Ysyn", prior_ctrl_names)]
+    priorpred_ctrl = colQuantiles(prior_ctrl[, grepl("Ysyn", prior_ctrl_names)], probs=c(0.025,0.5,0.975))
     prior_control = prior_ctrl[,!grepl("Ysyn", prior_ctrl_names)]
     
     posterior_pat_names = colnames(posterior_pat)
     post_pat = posterior_pat[,!(grepl("class", posterior_pat_names)|grepl("Ysyn",posterior_pat_names))]
-    postpred_pat = posterior_pat[,grepl("Ysyn", posterior_pat_names)]
+    postpred_pat = colQuantiles(posterior_pat[,grepl("Ysyn", posterior_pat_names)], probs=c(0.025,0.5,0.975))
     
     prior_pat_names = colnames(prior_pat)
-    priorpred_pat = prior_pat[,grepl("Ysyn", prior_pat_names)]
+    priorpred_pat = colQuantiles(prior_pat[,grepl("Ysyn", prior_pat_names)], probs=c(0.025,0.5,0.975))
     prior_patient = prior_pat[,!grepl("Ysyn",prior_pat_names)]
     
     ctrl_inference = list(post=post_ctrl, postpred=postpred_ctrl, 
@@ -167,13 +201,13 @@ mc_data[mc_raw[,"patient_id"] %in% pts_raw[grep("C0", pts_raw)],"patient_id"] = 
 pts_all = unique(mc_data$patient_id)
 pts  = pts_all[pts_all!="control"]
 mitochan = "VDAC"
-channels = c("MTCO1")
+channels = c("MTCO1", "NDUFB8", "CYB")
 
 inputs = list()
 {
   input0 = list()
-  input0$MCMCOut = 5000
-  input0$MCMCBurnin = 1000
+  input0$MCMCOut = 1000
+  input0$MCMCBurnin = 100
   input0$MCMCThin = 1
   input0$n.chains = 1
   i = 0
@@ -186,8 +220,6 @@ inputs = list()
     } # pts
   } # chans
 }
-
-inference(inputs[[1]])
 
 ncores = 12
 cl  = makeCluster(ncores) 
