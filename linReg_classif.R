@@ -23,7 +23,6 @@ modelstring = "
  }
 "
 
-
 dir.create(file.path("./Output"), showWarnings = FALSE)
 dir.create(file.path("./Output/linReg_classif"), showWarnings = FALSE)
 
@@ -121,26 +120,41 @@ inference = function(input){
     model_pat = jags.model(textConnection(modelstring), data=data_pat, n.chains=n.chains)
     model_pat_priorpred = jags.model(textConnection(modelstring), data=data_pat_priorpred)
     update(model_pat, n.iter=MCMCBurnin)
-    #converge_pat=coda.samples(model=model_pat,variable.names=c("m","c","tau_par","class","probdiff"),n.iter=MCMCUpdates_Report,thin=MCMCUpdates_Thin)
-    output_pat = coda.samples(model=model_pat, n.iter=MCMCOut*MCMCThin, thin=MCMCThin,
+    # converge_pat = coda.samples(model=model_pat,variable.names=c("m","c","tau_par","class","probdiff"),n.iter=MCMCUpdates_Report,thin=MCMCUpdates_Thin)
+    output_pat_post = coda.samples(model=model_pat, n.iter=MCMCOut*MCMCThin, thin=MCMCThin,
                               variable.names=c("m","c","tau","Ysyn","class","probdiff"))
-    output_pat_priorpred=coda.samples(model=model_pat_priorpred,n.iter=MCMCOut, thin=1,
-                                      variable.names=c("m","c","tau","Ysyn","probdiff"))
+    output_pat_prior = coda.samples(model=model_pat_priorpred,n.iter=MCMCOut, thin=1,
+                                        variable.names=c("m","c","tau","Ysyn","probdiff"))
     
-    posterior_pat = as.data.frame(output_pat[[1]])
-    prior_pat = as.data.frame(output_pat_priorpred[[1]])
+    posterior_pat = as.data.frame(output_pat_post[[1]])
+    prior_pat = as.data.frame(output_pat_prior[[1]])
     
-    summ_pat = summary(output_pat)
+    summ_pat = summary(output_pat_post)
     classifs_pat = summ_pat$statistics[grepl("class",rownames(summ_pat$statistics)),"Mean"]
     
+    posterior_ctrl_names = colnames(posterior_ctrl)
+    post_ctrl = posterior_ctrl[,!(grepl("class", posterior_ctrl_names)|grepl("Ysyn", posterior_ctrl_names))]
+    postpred_ctrl = posterior_ctrl[,grepl("Ysyn", posterior_ctrl_names)]
     
-    posterior_ctrl = posterior_ctrl[,!grepl("class", colnames(posterior_ctrl))]
-    prior_ctrl = prior_ctrl[,!grepl("class", colnames(prior_ctrl))]
-    posterior_pat = posterior_pat[,!grepl("class", colnames(posterior_pat))]
-    prior_pat = prior_pat[,!grepl("class", colnames(prior_pat))]
+    prior_ctrl_names = colnames(prior_ctrl)
+    priorpred_ctrl = prior_ctrl[, grepl("Ysyn", prior_ctrl_names)]
+    prior_control = prior_ctrl[,!grepl("Ysyn", prior_ctrl_names)]
     
-    ctrl_inference = list(post=posterior_ctrl, prior=prior_ctrl, classif=classifs_ctrl)
-    pat_inference = list(post=posterior_pat, prior=prior_pat, classif=classifs_pat)
+    posterior_pat_names = colnames(posterior_pat)
+    post_pat = posterior_pat[,!(grepl("class", posterior_pat_names)|grepl("Ysyn",posterior_pat_names))]
+    postpred_pat = posterior_pat[,grepl("Ysyn", posterior_pat_names)]
+    
+    prior_pat_names = colnames(prior_pat)
+    priorpred_pat = prior_pat[,grepl("Ysyn", prior_pat_names)]
+    prior_patient = prior_pat[,!grepl("Ysyn",prior_pat_names)]
+    
+    ctrl_inference = list(post=post_ctrl, postpred=postpred_ctrl, 
+                          prior=prior_control, priorpred=priorpred_ctrl,
+                          classif=classifs_ctrl)
+    pat_inference = list(post=posterior_pat, postpred=postpred_pat,
+                         prior=prior_patient, priorpred=priorpred_pat,
+                         classif=classifs_pat)
+    
     return( list(ctrl=ctrl_inference, pat=pat_inference) )
   })
 }
@@ -173,6 +187,8 @@ inputs = list()
   } # chans
 }
 
+inference(inputs[[1]])
+
 ncores = 12
 cl  = makeCluster(ncores) 
 {
@@ -197,16 +213,24 @@ for(index in 1:length(linreg_output)){
   
   write.table(output[["pat"]]$post, paste0("./Output/linReg_classif/", outroot_pat,"_POST.txt"), 
               row.names=FALSE, col.names=TRUE)
+  write.table(output[["pat"]]$postpred, paste0("./Output/linReg_classif/", outroot_pat,"_POSTPRED.txt"), 
+              row.names=FALSE, col.names=TRUE)
   write.table(output[["pat"]]$classif, paste0("./Output/linReg_classif/",outroot_pat,"_CLASS.txt"), 
               row.names=FALSE, col.names=TRUE)
   write.table(output[["pat"]]$prior, paste0("./Output/linReg_classif/", outroot_pat,"_PRIOR.txt"), 
               row.names=FALSE, col.names=TRUE)
+  write.table(output[["pat"]]$priorpred, paste0("./Output/linReg_classif/", outroot_pat,"_PRIORPRED.txt"), 
+              row.names=FALSE, col.names=TRUE)
   
   write.table(output[["ctrl"]]$post, paste0("./Output/linReg_classif/", outroot_ctrl,"_POST.txt"), 
+              row.names=FALSE, col.names=TRUE)
+  write.table(output[["ctrl"]]$postpred, paste0("./Output/linReg_classif/", outroot_ctrl,"_POSTPRED.txt"), 
               row.names=FALSE, col.names=TRUE)
   write.table(output[["ctrl"]]$classif, paste0("./Output/linReg_classif/", outroot_ctrl,"_CLASS.txt"), 
               row.names=FALSE, col.names=TRUE)
   write.table(output[["ctrl"]]$prior, paste0("./Output/linReg_classif/", outroot_ctrl,"_PRIOR.txt"), 
+              row.names=FALSE, col.names=TRUE)
+  write.table(output[["ctrl"]]$priorpred, paste0("./Output/linReg_classif/", outroot_ctrl,"_PRIORPRED.txt"), 
               row.names=FALSE, col.names=TRUE)
 }
 
