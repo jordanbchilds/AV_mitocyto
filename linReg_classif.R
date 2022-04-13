@@ -89,14 +89,14 @@ inference = function(input){
     Nctrl = nrow(Yctrl)
     Npat = nrow(Ypat)
     
-    Xsyn = seq(0,5, length.out=1000)
+    Xsyn = seq(0, 5, length.out=1000)
   
     # prior parameters for control data
     c_est = 0
     tau_c = 1/2^2
     m_est = 0
     tau_m = 1/2^2
-    tau_shape = 3
+    tau_shape = 10
     tau_rate = 1
     N_syn = 1000
     alpha = 1
@@ -104,7 +104,7 @@ inference = function(input){
     
     ## control inference
     data_ctrl = list( Xobs=Yctrl[,1], Yobs=Yctrl[,2], N=Nctrl, Nsyn=N_syn,
-                      Xsyn=seq(min(Yctrl[,1])-1, max(Yctrl[,1])+1,length.out=N_syn),
+                      Xsyn=seq(min(Yctrl[,1])-1, max(Yctrl[,1])+1, length.out=N_syn),
                       mu_m=m_est, tau_m=tau_m, mu_c=c_est, tau_c=tau_c,
                       shape_tau=tau_shape, rate_tau=tau_rate,
                       alpha=alpha, beta=beta)
