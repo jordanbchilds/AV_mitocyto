@@ -3,8 +3,8 @@ library("MASS")
 library("parallel")
 library("mvtnorm")
 
-dir.create(file.path("./Output"), showWarnings = FALSE)
-dir.create(file.path("./Output/PCA_naiveBayes_GMM"), showWarnings = FALSE)
+dir.create(file.path("./OUTPUT"), showWarnings = FALSE)
+dir.create(file.path("./OUTPUT/PCA_naiveBayes_GMM"), showWarnings = FALSE)
 
 rbern = function(n,p) rbinom(n,1,p)
 
@@ -161,8 +161,8 @@ for(index in 1:length(gmm_output)){
   
   outroot = paste(chan, pat, sep="_")
   
-  write.table(output$post, paste0("./Output/PCA_naiveBayes_GMM/",outroot,"_POST.txt"), row.names=FALSE, col.names=TRUE)
-  write.table(output$classif, paste0("./Output/PCA_naiveBayes_GMM/",outroot,"_CLASS.txt"), row.names=FALSE, col.names=TRUE)
+  write.table(output$post, paste0("./OUTPUT/PCA_naiveBayes_GMM/",outroot,"_POST.txt"), row.names=FALSE, col.names=TRUE)
+  write.table(output$classif, paste0("./OUTPUT/PCA_naiveBayes_GMM/",outroot,"_CLASS.txt"), row.names=FALSE, col.names=TRUE)
 }
 
 ### prior beliefs
@@ -176,7 +176,7 @@ for(index in 1:length(gmm_output)){
   
   n_1 = 15
   S_1 = matrix(c(2, 0, 0, 0.25), nrow=p, ncol=p, byrow=TRUE)*(n_1-p-1)
-  n_2 = 200
+  n_2 = 50
   S_2 = matrix(c(10^2,0,0,10^2), nrow=p, ncol=p, byrow=TRUE)*(n_2-p-1)
   
   alpha_pi = 1
