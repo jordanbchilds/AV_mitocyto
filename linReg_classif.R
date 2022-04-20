@@ -209,16 +209,15 @@ inputs = list()
 {
   input0 = list()
   input0$MCMCOut = 2000
-  input0$MCMCBurnin = 2000
+  input0$MCMCBurnin = 1000
   input0$MCMCThin = 1
   input0$n.chains = 1
-  i = 0
   for(chan in channels){
     for(pat in pts){
-      i = i + 1
-      inputs[[i]] = input0
-      inputs[[i]]$chan = chan
-      inputs[[i]]$pat = pat
+      outroot = paste(froot, chan, pat, sep="_")
+      inputs[[outroot]] = input0
+      inputs[[outroot]]$chan = chan
+      inputs[[outroot]]$pat = pat
     } # pts
   } # chans
 }
@@ -234,40 +233,25 @@ cl  = makeCluster(ncores)
 }
 stopCluster(cl)
 
-# save output
-for(index in 1:length(linreg_output)){
-  output = linreg_output[[index]]
-  chan = inputs[[index]]$chan
-  pat = gsub("_",".",inputs[[index]]$pat)
+output_saver = function(outroot, output){
+  split = strsplit(outroot, split="_")[[1]]
+  froot = split[1]
+  chan = split[2]
+  pat = split[3]
   
-  outroot_pat = paste(chan, "CONTROL", sep="_")
-  outroot_ctrl = paste(chan, pat, sep="_")
-  
-  output = linreg_output[[index]]
-  
-  write.table(output[["pat"]]$post, paste0("./Output/linReg_classif/", outroot_pat,"_POST.txt"), 
-              row.names=FALSE, col.names=TRUE)
-  write.table(output[["pat"]]$postpred, paste0("./Output/linReg_classif/", outroot_pat,"_POSTPRED.txt"), 
-              row.names=FALSE, col.names=TRUE)
-  write.table(output[["pat"]]$classif, paste0("./Output/linReg_classif/",outroot_pat,"_CLASS.txt"), 
-              row.names=FALSE, col.names=TRUE)
-  write.table(output[["pat"]]$prior, paste0("./Output/linReg_classif/", outroot_pat,"_PRIOR.txt"), 
-              row.names=FALSE, col.names=TRUE)
-  write.table(output[["pat"]]$priorpred, paste0("./Output/linReg_classif/", outroot_pat,"_PRIORPRED.txt"), 
-              row.names=FALSE, col.names=TRUE)
-  
-  write.table(output[["ctrl"]]$post, paste0("./Output/linReg_classif/", outroot_ctrl,"_POST.txt"), 
-              row.names=FALSE, col.names=TRUE)
-  write.table(output[["ctrl"]]$postpred, paste0("./Output/linReg_classif/", outroot_ctrl,"_POSTPRED.txt"), 
-              row.names=FALSE, col.names=TRUE)
-  write.table(output[["ctrl"]]$classif, paste0("./Output/linReg_classif/", outroot_ctrl,"_CLASS.txt"), 
-              row.names=FALSE, col.names=TRUE)
-  write.table(output[["ctrl"]]$prior, paste0("./Output/linReg_classif/", outroot_ctrl,"_PRIOR.txt"), 
-              row.names=FALSE, col.names=TRUE)
-  write.table(output[["ctrl"]]$priorpred, paste0("./Output/linReg_classif/", outroot_ctrl,"_PRIORPRED.txt"), 
-              row.names=FALSE, col.names=TRUE)
+  for(ctrl_pat in c("ctrl", "pat")){
+    out_ctrlpat = ifelse(ctrl_pat=="ctrl", "CONTROL", pat)
+    for(out_type in names(output[[ctrl_pat]])){
+      filename = paste(froot, chan, out_ctrlpat, toupper(out_type), sep="_")
+      write.table(output[[ctrl_pat]][[out_type]], paste0("./Output/linReg_classif/", filename, ".txt"),
+                  row.names=FALSE, col.names=TRUE)
+    }
+  }
 }
 
+for(outroot in names(linreg_output)){
+  output_saver(outroot, linreg_output[[outroot]])
+}
 
 
 

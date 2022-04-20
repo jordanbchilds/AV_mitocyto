@@ -1,3 +1,4 @@
+library(MASS)
 
 dir.create(file.path("./PDF"), showWarnings = FALSE)
 dir.create(file.path("./PDF/linReg_classif"), showWarnings = FALSE)
@@ -55,58 +56,34 @@ mc_data[mc_raw[,"patient_id"] %in% pts_raw[grep("C0", pts_raw)],"patient_id"] = 
 pts_all = unique(mc_data$patient_id)
 pts  = pts_all[pts_all!="control"]
 mitochan = "VDAC"
-channels = c("MTCO1")
+channels = c("MTCO1", "NDUFB8", "CYB")
+
 
 ######################
 ### PRIORS AND POSTERIORS
 ######################
-post = list()
-postpred = list()
-prior = list()
-priorpred = list()
-classif = list()
-{
-  post$ctrl = list()
-  post$pat = list()
-  postpred$ctrl = list()
-  postpred$pat = list()
-  classif$pat = list()
-  classif$ctrl = list()
-  prior$ctrl = list()
-  prior$pat = list()
-  priorpred$ctrl = list()
-  priorpred$pat = list()
-  
-  for(chan in channels){
-    outroot_ctrl = paste(chan, "CONTROL", sep="_")
-    
-    fpc_prior = paste0("./Output/linReg_classif/", outroot_ctrl, "_PRIOR.txt" )
-    fpc_post = paste0("./Output/linReg_classif/", outroot_ctrl, "_POST.txt" )      
-    fpc_classif = paste0("./Output/linReg_classif/", outroot_ctrl, "_CLASSIF.txt" )
-    fpc_priorpred = paste0("./Output/linReg_classif/", outroot_ctrl, "_PRIORPRED.txt")
-    fpc_postpred = paste0("./Output/linReg_classif/", outroot_ctrl, "_POSTPRED.txt")
-    # if(file.exists(fpc_prior)) prior$ctrl[[outroot_ctrl]] = read.table(fpc_prior, header=TRUE, stringsAsFactors = FALSE)
-    # if(file.exists(fpc_post)) post$ctrl[[outroot_ctrl]] = read.table(fpc_post, header=TRUE, stringsAsFactors = FALSE)
-    # if(file.exists(fpc_classif)) classif$ctrl[[outroot_ctrl]] = read.table(fpc_classif, header=TRUE, stringsAsFactors = FALSE)
-    if(file.exists(fpc_priorpred)) priorpred$ctrl[[outroot_ctrl]] = read.table(fpc_priorpred, header=TRUE, stringsAsFactor=FALSE)
-    if(file.exists(fpc_postpred)) postpred$ctrl[[outroot_ctrl]] = read.table(fpc_postpred, header=TRUE, stringsAsFactor=FALSE)
-    # 
-    for(pat in pts){
-      outroot_pat = paste(chan, pat, sep="_")
-      fpp_prior = paste0("./Output/linReg_classif/", outroot_pat, "_PRIOR.txt" )
-      fpp_post = paste0("./Output/linReg_classif/", outroot_pat, "_POST.txt" )
-      fpp_classif = paste0("./Output/linReg_classif/", outroot_pat, "_CLASSIF.txt" )
-      fpp_priorpred = paste0("./Output/linReg_classif/", outroot_pat, "_PRIORPRED.txt")
-      fpp_postpred = paste0("./Output/linReg_classif/", outroot_pat, "_POSTPRED.txt")
-      # if(file.exists(fpp_post)) post$pat[[outroot_pat]] = read.table(fpp_post, header=TRUE, stringsAsFactors=FALSE)
-      # if(file.exists(fpp_classif)) classif$pat[[outroot_pat]] = read.table(fpp_classif, header=TRUE, stringsAsFactors=FALSE)
-      # if(file.exists(fpp_prior)) prior$pat[[outroot_pat]] = read.table(fpp_prior, header=TRUE, stringsAsFactors = FALSE)
-      if(file.exists(fpp_priorpred)) priorpred$pat[[outroot_ctrl]] = read.table(fpp_priorpred, header=TRUE, stringsAsFactor=FALSE)
-      if(file.exists(fpp_postpred)) postpred$pat[[outroot_ctrl]] = read.table(fpp_postpred, header=TRUE, stringsAsFactor=FALSE)
 
-    } #  patients
-  } # channels
+output_reader = function(fulldats="", out_type, channels=channels){
+  out = list()
+  for(fulldat in fulldats){
+    ctrl_pats = c("CONTROL", pts)
+    for(chan in channels){
+      for(pat in ctrl_pats){
+        outroot = paste(froot, chan, pat, sep="_")
+        fp = paste0("./Output/linReg_classif/", outroot, "_", out_type, ".txt")
+        if(file.exists(fp)) out[[outroot]] = read.table(fp, header=TRUE, stringsAsFactors=FALSE)
+      }
+    }
+  }
+  return(out)
 }
+
+post = output_reader(out_type="POST")
+postpred = output_reader(out_type="POSTPRED")
+classif = output_reader(out_type="CLASS")
+prior = output_reader(out_type="PRIOR")
+priorpred = output_reader(out_type="PRIORPRED")
+
 
 ##
 ## COLOURS
@@ -118,8 +95,9 @@ myBlue = function(alpha) rgb(0,0,128/255, alpha)
 myRed = function(alpha) rgb(1,0,0, alpha)
 myGreen = function(alpha) rgb(0,100/255,0, alpha)
 myYellow = function(alpha) rgb(225/255,200/255,50/255, alpha)
+myPink = function(alpha) rgb(255/255,62/255,150/255, alpha)
 
-cramp = colorRamp(c(myRed(0.2),myBlue(0.2)), alpha=TRUE)
+cramp = colorRamp(c(myBlue(0.2),myRed(0.2)), alpha=TRUE)
 # rgb(...) specifies a colour using standard RGB, where 1 is the maxColorValue
 # 0.25 determines how transparent the colour is, 1 being opaque 
 # cramp is a function which generates colours on a scale between two specifies colours
@@ -151,7 +129,7 @@ classcols = function(classif){
     col.names = colnames(post)
     n.chains = length(post)
     
-    par(mfrow=c(3,3), mar = c(5.5,5.5,4,4))
+    par(mfrow=c(2,3), mar = c(5.5,5.5,4,4))
     for(param in col.names){
       plot(ts(post[[param]]), xlab="Iteration", ylab=paste(param), 
            main="", cex.lab=1.2)
@@ -164,42 +142,34 @@ classcols = function(classif){
       title(main=title, line=-2, outer=TRUE, cex.main=1.6)
     }
   }
-  
-  rowQuantiles = function(x, probs=0.5){
-    quants = matrix(NA, nrow=nrow(x), ncol=length(probs))
-    for(i in 1:nrow(x)){
-      quants[i,] = quantile(x[i,], probs)
-    }
-    quants
-  }
-  priorpost_comp = function(data, priorpred, postpred, pat_data = NULL, 
-                            classif, lims, Xsyn, 
+  priorpost_comp = function(ctrl_data, pat_data=NULL, priorpred, postpred,
+                            classif=NULL, 
                             chan, mitochan="VDAC1", title){
-     
-    xlims = lims[[1]]
-    ylims = lims[[2]]
+    
+    xlims = range(c(ctrl_data[,1], pat_data[,1]))
+    ylims = range(c(ctrl_data[,2], pat_data[,2]))
+    Xsyn = seq(min(ctrl_data[,1])-1, max(ctrl_data[,1])+1, length.out=1000)
     
     par(mfrow=c(1,2))
-    plot(data, pch=20, col=myGrey(0.1), xlim=xlims, ylim=ylims,
+    plot(ctrl_data, pch=20, cex=0.7, col=myGrey(0.1), xlim=xlims, ylim=ylims,
          xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
-         main="Control Prior")
-    if(!is.null(pat_data)) points(pat_data, pch=20, col=myYellow(0.2))
-    priorpred_qnts = rowQuantiles(priorpred)
-    lines(Xsyn, priorpred_qnts[,c(1,3)], lty=2, col="green", lwd=2)
-    lines(Xsyn, priorpred_qnts[,2], lty=1, col="green", lwd=3)
+         main="Prior Predictive")
+    if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=myYellow(0.2))
+    lines(Xsyn, priorpred[,1], lty=2, col=myGreen(0.6), lwd=3)
+    lines(Xsyn, priorpred[,2], lty=1, col=myGreen(0.6), lwd=4)
+    lines(Xsyn, priorpred[,3], lty=2, col=myGreen(0.6), lwd=3)
     
     plot(ctrl_data, pch=20, col=myGrey(0.1), xlim=xlims, ylim=ylims,
          xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
-         main="Control Prior")
-    if(!is.null(pat_data)) points(pat_data, pch=20, col=classcols(classif))
-    postpred_qnts = rowQuantiles(post_pat)
-    lines(Xsyn, postpred_pat_qnts[,c(1,3)], lty=2, col="blue", lwd=2)
-    lines(Xsyn, postpred_pat_qnts[,2], lty=1, col="blue", lwd=3)
+         main="Posterior Predictive")
+    if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=classcols(classif))
+    lines(Xsyn, postpred[,1], lty=2, col=myPink(0.6), lwd=3)
+    lines(Xsyn, postpred[,2], lty=1, col=myPink(0.6), lwd=4)
+    lines(Xsyn, postpred[,3], lty=2, col=myPink(0.6), lwd=3)
     
-    title(main=paste(title), line=-1, outer=TRUE, cex.main=1.6)
   }
   
-  pi_post = function(post_pat, chan, title){
+  pi_post = function(pipost_list, title){
     # do something
   }
 }
@@ -210,43 +180,82 @@ classcols = function(classif){
 ##
 pdf("./PDF/linReg_classif/MCMC.pdf", width=13, height=8)
 {
-  
   for(chan in channels){
-    froot_ctrl = paste(chan, "CONTROL", sep="_")
-    MCMCplot(post$ctrl[[froot_ctrl]], prior$ctrl[[froot_ctrl]], froot_ctrl)
+    outroot_ctrl = paste(chan, "CONTROL", sep="_")
+    MCMCplot(post[[outroot_ctrl]], prior[[outroot_ctrl]], 
+             title=paste(chan, "CONTROL"))
     for(pat in pts){
-      froot_pat = paste(chan, pat, sep="_")
-      MCMCplot(post$pat[[chanpat]], prior$pat[[chanpat]], froot_pat)
+      outroot_pat = paste(chan, pat, sep="_")
+      MCMCplot(post[[outroot_pat]], prior[[outroot_pat]], 
+               title=paste(chan, pat))
     }
   }
 }
 dev.off()
-
 
 pdf("./PDF/linReg_classif/model_post.pdf", width=13, height=8)
 {
-  for(chan in c("MTCO1")){
-    froot = paste(chan, "CONTROL", sep="_")
-    data = getData_mats(chan=chan)
+  for(chan in channels){
+    outroot_ctrl = paste(chan, "CONTROL", sep="_")
+    ctrl_data = getData_mats(chan=chan, ctrl_only=TRUE)
+    priorpost_comp(ctrl_data=ctrl_data, 
+                   priorpred=priorpred[[outroot_ctrl]], postpred=postpred[[outroot_ctrl]],
+                   chan=chan, mitochan="VDAC1", title=paste(chan, 'CONTROL'))
     
-    lims = list(c(0,6), c(0,6))
-    Xsyn = seq(0.9*min(data$ctrl[,1]), 1.1*max(data$ctrl[,1]), length.out=1000)
-
-    priorpost_comp(data=ctrl_data$Yctrl, priorpred=priorpred$ctrl[[froot]], 
-                   postpred=postpred$ctrl[[froot]], classif=classif$ctrl[[froot]], 
-                   lims=lims, Xsyn=Xsyn, 
-                   chan=chan, title=paste(chan, "CONTROL"))
     for(pat in pts){
-      froot = paste(chan, pat, sep="_")
-      pat_data = getData_mats(chan=chan, pat=pat)
-      priorpost_comp(data=ctrl_data$Yctrl, pat_data=pat_data$Ypat, 
-                     post=postpred, prior=priorpred, 
-                     classif=classif$pat[[froot]], 
-                     title=paste(chan, pat))
+      outroot_pat = paste(chan, pat, sep="_")
+      pat_data = getData_mats(chan=chan, pts=pat)$pat
+      
+      priorpost_comp(ctrl_data=ctrl_data, pat_data=pat_data,
+                     classif=classif[[outroot_pat]][,1],
+                     priorpred=priorpred[[outroot_pat]], postpred=postpred[[outroot_pat]],
+                     chan=chan, mitochan="VDAC1", title=paste(chan, pat))
     }
   }
 }
 dev.off()
+
+pipost_list = list()
+piprior_list = list()
+for(chan in channels){
+  temp_post = list()
+  temp_prior = list()
+  for(pat in pts){
+    temp_post[[pat]] = 1 - post[[paste(chan, pat, sep="_")]][,"probdiff"]
+    temp_prior[[pat]] = 1 - prior[[paste(chan, pat, sep="_")]][,"probdiff"]
+  }
+  pipost_list[[chan]] = temp_post
+  piprior_list[[chan]] = temp_prior
+}
+
+pdf("./PDF/linReg_classif/pi_post.pdf", width=13, height=8)
+{
+  for(chan in channels){
+    stripchart(pipost_list[[chan]], vertical=TRUE, pch=20, cex=0.7,
+               col=myPink(0.02), method="jitter", jitter=0.1, ylim=c(0,1), 
+               main=paste(chan), ylab="Like Control Proportion", 
+               group.names=pts)
+    # stripchart(pipost_list[[chan]], vertical=TRUE, pch=20, cex=0.5, col=myPink(0.035), 
+    #            method="jitter", jitter=0.2, add=TRUE, at=c(1:length(pts)))
+  }
+}
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

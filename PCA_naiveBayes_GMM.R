@@ -9,7 +9,7 @@ dir.create(file.path("./Output/PCA_naiveBayes_GMM"), showWarnings = FALSE)
 rbern = function(n,p) rbinom(n,1,p)
 
 getData_mats = function(fulldat="Data_prepped.csv", mitochan="VDAC", chan, 
-                        pts=NULL, ctrl_only=FALSE){
+                        pts=NULL, ctrl_only=FALSE, PCA=TRUE){
   data_raw = read.csv(fulldat, header=TRUE)
   
   pts_raw = unique(data_raw$patient_id)
@@ -21,18 +21,18 @@ getData_mats = function(fulldat="Data_prepped.csv", mitochan="VDAC", chan,
   ctrl_data = data[data$patient_id=="control", ]
   Xctrl = log(ctrl_data[[mitochan]])
   Yctrl = log(ctrl_data[[chan]])
-  XY_ctrl = cbind( Xctrl, Yctrl )
+  ctrl_mat = cbind( Xctrl, Yctrl )
   
   if(!ctrl_only){
     if(is.null(pts)){
-      Ypat_all = matrix(NA, nrow=1, ncol=2)
+      pat_mat = matrix(NA, nrow=1, ncol=2)
       Npats = vector("numeric")
       for(pat in pts_all[grepl("P", pts_all)]){
         pat_data = data[data$patient_id==pat,]
         Xpat = log(pat_data[[mitochan]])
         Ypat = log(pat_data[[chan]])
         XY_pat = cbind(Xpat, Ypat)
-        Ypat_all = rbind(Ypat_all, XY_pat)
+        pat_mat = rbind(pat_mat, XY_pat)
         Npats[pat] = nrow(XY_pat)
       }
     } else {
@@ -43,14 +43,28 @@ getData_mats = function(fulldat="Data_prepped.csv", mitochan="VDAC", chan,
         Xpat = log(pat_data[[mitochan]])
         Ypat = log(pat_data[[chan]])
         XY_pat = cbind(Xpat, Ypat)
-        Ypat_all = rbind(Ypat_all, XY_pat)
+        pat_mat = rbind(pat_mat, XY_pat)
         Npats[pat] = nrow(XY_pat)
       }
     }
   }
   
-  if(ctrl_only) return(XY_ctrl)
-  return(list(ctrl=XY_ctrl, pat=Ypat_all[-1,], Npats=Npats))
+  pat_mat = pat_mat[-1,]
+  
+  if(!PCA){
+    if(ctrl_only) return(ctrl_mat)
+    else return(list(ctrl=ctrl_mat, pat=pat_mat, Npats=Npats))
+  } else {
+    # PCA
+    pca = prcomp(ctrl_mat, center=FALSE, scale=FALSE)
+    pca_mean = colMeans(pca$x)
+    ctrlmat_cen = sweep(pca$x, 2, pca_mean)
+    if(ctrl_only) return(ctrlmat_cen)
+    else {
+      patmat_cen = sweep(pat_mat%*%pca$rotation, 2, pca_mean)  
+      return(list(ctrl=ctrlmat_cen, pat=patmat_cen, Npats=Npats))
+    }
+  }
 }
 
 fp_data = "Data_prepped.csv"
@@ -145,8 +159,7 @@ for(index in 1:length(gmm_output)){
   pat = gsub("_",".",inputs[[index]]$pat)
   fulldat = inputs[[index]]$fulldat
   
-  froot = gsub(".RAW.txt","",fulldat)
-  outroot = paste(froot, chan, pat, sep="_")
+  outroot = paste(chan, pat, sep="_")
   
   write.table(output$post, paste0("./Output/PCA_naiveBayes_GMM/",outroot,"_POST.txt"), row.names=FALSE, col.names=TRUE)
   write.table(output$classif, paste0("./Output/PCA_naiveBayes_GMM/",outroot,"_CLASS.txt"), row.names=FALSE, col.names=TRUE)
@@ -180,7 +193,19 @@ output_prior = stan("naiveBayes_GMM_prior.stan", data=data_prior, chains=1,
                     iter=1e4, warmup=0, thin=1)
 
 prior_all= as.matrix(output_prior)
-prior = prior_all[, !grepl("_", colnames(prior_all))]
+prior_cols = colnames(prior_all)
+prior = prior_all[, !(grepl("_", prior_cols)|
+                      grepl("comp", prior_cols)|
+                      grepl("pred", prior_cols))]
+priorpred = prior_all[, grepl("comp", prior_cols)|grepl("pred",prior_cols)]
 
-write.table(prior, paste0("./Output/PCA_naiveBayes_GMM/allData_PRIOR.txt"), 
+write.table(prior, paste0("./OUTPUT/PCA_naiveBayes_GMM/allData_PRIOR.txt"), 
             row.names=FALSE, col.names=TRUE)
+write.table(priorpred, paste0("./OUTPUT/PCA_naiveBayes_GMM/allData_PRIORPRED.txt"), 
+            row.names=FALSE, col.names=TRUE)
+
+
+
+
+
+
