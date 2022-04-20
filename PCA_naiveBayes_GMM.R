@@ -36,7 +36,7 @@ getData_mats = function(fulldat="Data_prepped.csv", mitochan="VDAC", chan,
         Npats[pat] = nrow(XY_pat)
       }
     } else {
-      Ypat_all = matrix(NA, nrow=1, ncol=2)
+      pat_mat = matrix(NA, nrow=1, ncol=2)
       Npats = vector("numeric")
       for(pat in pts){
         pat_data = data[data$patient_id==pat,]
@@ -140,6 +140,8 @@ inputs = list()
     } # pts
   } # chans
 }
+
+inference(inputs[[1]])
 
 ncores = 18
 cl  = makeCluster(ncores) 
