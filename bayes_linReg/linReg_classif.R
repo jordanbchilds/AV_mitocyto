@@ -182,7 +182,7 @@ inputs = list()
   } # chans
 }
 
-ncores = 24
+ncores = detectCores()
 cl  = makeCluster(ncores)
 {
   clusterExport(cl, c("modelstring"))
