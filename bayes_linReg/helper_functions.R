@@ -43,7 +43,6 @@ getData_mats = function(chan, mitochan="VDAC",
   list(ctrl=ctrl_mat, pts=pat_mat)
 }
 
-
 ##
 ## COLOURS
 ##
@@ -120,25 +119,25 @@ log_transform = function(ctrl_mat, pat_mat=NULL){
 ## READ & SAVERS AOUTPUT
 ##
 
-output_saver = function(outroot, output, folder){
+output_saver = function(output, folder, outroot){
   split = strsplit(outroot, split="_")[[1]]
-  froot = split[1]
-  chan = split[2]
-  pat = split[3]
+  chan = split[1]
+  pat = split[2]
   
-  for(ctrl_pat in c("ctrl", "pat")){
+  for(ctrl_pat in names(output)){
     out_ctrlpat = ifelse(ctrl_pat=="ctrl", "CONTROL", pat)
     for(out_type in names(output[[ctrl_pat]])){
-      filename = paste(froot, chan, out_ctrlpat, toupper(out_type), sep="_")
+      filename = paste(chan, out_ctrlpat, toupper(out_type), sep="_")
       write.table(output[[ctrl_pat]][[out_type]], paste0(file.path("Output", folder, filename), ".txt"),
                   row.names=FALSE, col.names=TRUE)
     }
   }
 }
 
-output_reader = function(folder, fulldat, chan, pat="CONTROL", out_type){
-  outroot = paste(gsub(".RAW.txt", "", fulldat), chan, gsub("_",".", pat), sep="_")
-  fp = file.path("./Output", folder, paste0(outroot, "_", out_type, ".txt"))
+output_reader = function(folder, chan, pat, out_type){
+  outroot = paste(chan, pat, sep="_")
+  
+  fp = file.path("Output", folder, paste0(outroot, "_", out_type, ".txt"))
   if(file.exists(fp)) return( read.table(fp, header=TRUE, stringsAsFactors=FALSE) )
   else stop("file does not exist")
 }
@@ -159,9 +158,10 @@ classif_plot = function(ctrl_data, pat_data, classifs_pat, chan, mitochan, pat){
     points(pat_data, pch=20, col=classcols(classifs_pat))
   }
   
-MCMCplot = function(folder, fulldat, chan, pat="CONTROL", title="", lag=20){
-    post = output_reader(folder, fulldat, chan, pat, out_type="POST")
-    prior = output_reader(folder, fulldat, chan, out_type="PRIOR")
+MCMCplot = function(folder, chan, pat, title="", lag=20){
+  
+    post = output_reader(folder, chan, pat, out_type="POST")
+    prior = output_reader(folder, chan, pat,  out_type="PRIOR")
     
     col.names = colnames(post)
     n.chains = length(post)
@@ -189,28 +189,27 @@ priorpost = function(ctrl_data, pat_data=NULL, priorpred, postpred,
                      classif=NULL, 
                      chan, mitochan="VDAC1", title="", xlims=NULL, ylims=NULL){
 
-    Xsyn = seq(min(ctrl_data[,1])*0.75, max(pat_data[,1])*1.25, length.out=1000)
-    
-    op = par(mfrow=c(1,2))
-    plot(ctrl_data, pch=20, cex=0.7, col=myGrey(0.1),
-         xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
-         main="Prior Predictive", xlim=xlims, ylim=ylims)
-    if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=myYellow(0.2))
-    lines(Xsyn, priorpred[,1], lty=2, col=myGreen(0.6), lwd=3)
-    lines(Xsyn, priorpred[,2], lty=1, col=myGreen(0.6), lwd=4)
-    lines(Xsyn, priorpred[,3], lty=2, col=myGreen(0.6), lwd=3)
-    
-    plot(ctrl_data, pch=20, col=myGrey(0.1),
-         xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
-         main="Posterior Predictive", xlim=xlims, ylim=ylims)
-    if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=classcols(classif))
-    lines(Xsyn, postpred[,1], lty=2, col=myPink(0.6), lwd=3)
-    lines(Xsyn, postpred[,2], lty=1, col=myPink(0.6), lwd=4)
-    lines(Xsyn, postpred[,3], lty=2, col=myPink(0.6), lwd=3)
-    
-    title(main=title, line=-2, outer=TRUE)
-    
-    par(op)
+  N_syn = 1e3
+  Xsyn = seq(0, max(c(ctrl_data[,1], pat_data[,1]))*1.5, length.out=N_syn) 
+  
+  op = par(mfrow=c(1,2))
+  plot(ctrl_data, pch=20, cex=0.7, col=myGrey(0.1),
+        xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
+       main="Prior Predictive", xlim=xlims, ylim=ylims)
+  if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=myYellow(0.2))
+  lines(Xsyn, priorpred[,1], lty=2, col=myGreen(0.6), lwd=3)
+  lines(Xsyn, priorpred[,2], lty=1, col=myGreen(0.6), lwd=4)
+  lines(Xsyn, priorpred[,3], lty=2, col=myGreen(0.6), lwd=3)
+  
+  plot(ctrl_data, pch=20, col=myGrey(0.1),
+       xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
+       main="Posterior Predictive", xlim=xlims, ylim=ylims)
+  if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=classcols(classif))
+  lines(Xsyn, postpred[,1], lty=2, col=myPink(0.6), lwd=3)
+  lines(Xsyn, postpred[,2], lty=1, col=myPink(0.6), lwd=4)
+  lines(Xsyn, postpred[,3], lty=2, col=myPink(0.6), lwd=3)
+  title(main=title, line=-2, outer=TRUE)
+  par(op)
 }
 
 colvector_gen = function(pts){
@@ -222,34 +221,45 @@ colvector_gen = function(pts){
   colind
 }
 
-pipost_plotter = function(fulldat, chan, folder, alpha=0.05){
-  pts = getData_chanpats(fulldat)$patients
-  pts_blocks = unique(gsub("_S.", "", pts))
+pipost_plotter = function(chan, folder, pts, alpha=0.05){
   npat = length(pts)
   pis = list()
   for(pat in pts){
-    pis[[pat]] = output_reader(folder, fulldat, chan, pat, out_type="POST")[,"probdiff"]
+    pis[[pat]] = 1 - output_reader(folder, chan, pat, out_type="POST")[,"probdiff"]
   }
-  
-  pat_labels = as.vector(rbind("", unique(gsub("_S.", "", gsub("P._", "", pts))), ""))
-  
-  title = paste0(substr(pts[1],1,2), " ", chan, "\n", gsub(".RAW.txt", "", fulldat) )
-  # par(mar=c(6,4,4,8), xpd=TRUE)
+
+  title = paste( chan )
+
   stripchart(pis, pch=20, method="jitter", vertical=TRUE, 
              col=rgb(t(col2rgb(palette()[colvector_gen(pts)]))/255, alpha=alpha), 
-             group.names=rep("", length(pts)),
-             main=title, ylim=c(0,1), ylab="like control proportion", 
+             group.names=pts,
+             at=1:length(pts),
+             main=title, ylim=c(0,1), ylab="Deficiency Proportion", 
              xlab="Patient Sample")
-  if(!all(substr(pts, 4,4)==substr(pts,4,4)[1])){
-    sep = sum(substr(pts, 4,4)==substr(pts,4,4)[1])+0.5
-    arrows(x0=sep, x1=sep, y0=0, y1=1, lwd=3, lty=2, length=0, 
-           col=myDarkGrey(1))
-  }
-  # legend(length(pts)+1, 1, lty=1, lwd=3, col=palette()[(1:length(pts_blocks)+2)], 
-  #        legend=gsub("P._", "" , pts_blocks))
-  text(1:length(pts), y=0, labels=pat_labels, pos=3, cex=1)
 }
 
+pipost_plotter_v2 = function(channels, pts, folder, alpha=0.01){
+  npat = length(pts)
+  pis = list()
+  for(pat in pts){
+    for(chan in channels){
+      pis[[paste(pat, chan, sep="_")]] = 1 - output_reader(folder, chan, pat, out_type="POST")[,"probdiff"]
+    }
+  }
+  
+  stripchart(pis, pch=20, method="jitter", vertical=TRUE, 
+             col=rgb(t(col2rgb(rep(palette()[1:length(channels) + 1], length(pts))))/255, alpha=alpha),
+             at=1:(length(channels)*length(pts)), 
+             xaxt="n", ylim=c(0,1),
+             main="", ylab="Deficiency Proportion", 
+             xlab="Patient" )
+  abline( v=(0:length(pts)-1)*3+3.5, lwd=4, lty="dotted", col=myGrey(0.2))
+  axis(1, at=(1:length(pts)-1)*3+2, labels=pts)
+  legend("topright", legend=channels, pch=20, col=rep(palette()[1:length(channels) + 1]),
+         cex=1.5, bty="o", bg="white", title="channels")
+  
+  
+}
 
 
 

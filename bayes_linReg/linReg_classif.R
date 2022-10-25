@@ -1,12 +1,12 @@
 library(rjags)
 library(MASS)
 library(parallel)
-source("./helper_functions.R", local=TRUE)
+source("helper_functions.R", local=TRUE)
 
 folder = "linReg_classifier"
 
-dir.create(file.path("./Output"), showWarnings = FALSE)
-dir.create(file.path("./Output", folder), showWarnings = FALSE)
+dir.create(file.path("Output"), showWarnings = FALSE)
+dir.create(file.path("Output", folder), showWarnings = FALSE)
 
 modelstring = "
  model {
@@ -35,10 +35,10 @@ modelstring = "
 inference = function(input){
   with(c(input),{
     data_mats = getData_mats(chan=chan, pts=pat)
-    Yctrl = data_mats$ctrl
-    Ypat = data_mats$pts
-    Nctrl = nrow(Yctrl)
-    Npat = nrow(Ypat)
+    ctrl_mat = data_mats$ctrl
+    pat_mat = data_mats$pts
+    Nctrl = nrow(ctrl_mat)
+    Npat = nrow(pat_mat)
     
     # prior parameters for control data
     c_est = 0
@@ -47,14 +47,13 @@ inference = function(input){
     tau_m = 1/2^2
     shape_tau = 10
     rate_tau = 1
-    shape_gamma = 20 # irrelevant - will only sample from prior
-    rate_gamma = 10 # irrelevant - will only sample from prior
-    N_syn = 1000
-    h = 0.01
+    shape_gamma = 20 
+    rate_gamma = 10 
+    N_syn = 1e4
     
     ## control inference
-    data_ctrl = list( Xobs=Yctrl[,1], Yobs=Yctrl[,2], N=Nctrl, Nsyn=N_syn,
-                      Xsyn=seq(min(Yctrl[,1])-1, max(Yctrl[,1])+1, length.out=N_syn),
+    data_ctrl = list( Xobs=ctrl_mat[,1], Yobs=ctrl_mat[,2], N=Nctrl, Nsyn=N_syn,
+                      Xsyn=seq(0, max(c(ctrl_mat[,1], pat_mat[,1]))*1.5, length.out=N_syn),
                       mu_m=m_est, tau_m=tau_m, mu_c=c_est, tau_c=tau_c,
                       shape_tau=shape_tau, rate_tau=rate_tau,
                       shape_gamma=shape_gamma, rate_gamma=rate_gamma,
@@ -86,21 +85,20 @@ inference = function(input){
     tau_c = flex/(sd(posterior_ctrl$c)^2)
     m_est = mean(posterior_ctrl$m)
     tau_m = flex/(sd(posterior_ctrl$m)^2)
-    delta = 1.5*as.numeric(quantile(posterior_ctrl$tau_ctrl,0.5)) # Choose this value so that Tiago's replication dataset never predicts over-expression of CI or CIV
+    # delta = 1.5*as.numeric(quantile(posterior_ctrl$tau_ctrl,0.5)) # Choose this value so that Tiago's replication dataset never predicts over-expression of CI or CIV
+    delta = 0
     tau_mean = mean(posterior_ctrl$tau_ctrl) + delta # Precision tau = (1/sd)^2
     tau_sd = sd(posterior_ctrl$tau_ctrl) # Deviation from prior tau should require a lot of contradictory data
     tau_shape = (tau_mean^2)/(tau_sd^2)
     tau_rate = tau_mean/(tau_sd^2)
     
-    gamma_mode = 20 # ctrl sampled from prior so can ignore the ctrl posterior
-    gamma_sd = 10 # ctrl sampled from prior so can ignore the ctrl posterior
+    gamma_mode = 20 
+    gamma_sd = 10 
     rate_gamma = (gamma_mode+sqrt(gamma_mode^2+4*gamma_mode^2))/(2*gamma_sd^2)
     shape_gamma = 1+gamma_mode*rate_gamma
-    
-    N_syn = 1000
-    
-    data_pat = list(Xobs=Ypat[,1], Yobs=Ypat[,2], N=Npat, Nsyn=N_syn,
-                    Xsyn=seq(min(Yctrl[,1])*0.75, max(Yctrl[,1])*1.25, length.out=N_syn),
+
+    data_pat = list(Xobs=pat_mat[,1], Yobs=pat_mat[,2], N=Npat, Nsyn=N_syn,
+                    Xsyn=seq(0, max(c(ctrl_mat[,1], pat_mat[,1]))*1.5, length.out=N_syn),
                     mu_m=m_est, tau_m=tau_m, 
                     mu_c=c_est, tau_c=tau_c,
                     shape_tau=tau_shape, rate_tau=tau_rate, 
@@ -167,9 +165,9 @@ pts = ptsAll[grepl("P", ptsAll)]
 inputs = list()
 {
   input0 = list()
-  input0$MCMCOut = 5000
-  input0$MCMCBurnin = 2000
-  input0$MCMCThin = 100
+  input0$MCMCOut = 2000
+  input0$MCMCBurnin = 1000
+  input0$MCMCThin = 50
   input0$n.chains = 1
   
   for(chan in cord){
@@ -182,25 +180,21 @@ inputs = list()
   } # chans
 }
 
-ncores = detectCores()
+ncores = detectCores() - 1
 cl  = makeCluster(ncores)
 {
   clusterExport(cl, c("modelstring"))
   clusterEvalQ(cl, {
     library("rjags")
-    source("./helper_functions.R", local=TRUE)
+    source("helper_functions.R", local=TRUE)
   })
   linreg_output = parLapply(cl, inputs, inference)
 }
 stopCluster(cl)
 
 for(outroot in names(linreg_output)){
-  output_saver(outroot, linreg_output[[outroot]], folder)
+  output_saver(linreg_output[[outroot]], folder, outroot)
 }
-
-
-
-
 
 
 
