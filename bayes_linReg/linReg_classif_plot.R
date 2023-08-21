@@ -16,6 +16,9 @@ dat = read.csv(file.path("..", "Data_prepped.csv"), stringsAsFactors=FALSE)
 ptsAll = unique(dat$patient_id)
 pts = ptsAll[grepl("P", ptsAll)]
 
+all_files = list.files(file.path("Output", folder))
+file.remove(file.path("Output", folder, all_files[grepl("NA", all_files)]))
+
 ######################
 ### the plots
 ######################

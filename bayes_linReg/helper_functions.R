@@ -189,7 +189,7 @@ priorpost = function(ctrl_data, pat_data=NULL, priorpred, postpred,
                      classif=NULL, 
                      chan, mitochan="VDAC1", title="", xlims=NULL, ylims=NULL){
 
-  N_syn = 1e3
+  N_syn = 1e4
   Xsyn = seq(0, max(c(ctrl_data[,1], pat_data[,1]))*1.5, length.out=N_syn) 
   
   op = par(mfrow=c(1,2))
@@ -212,14 +212,6 @@ priorpost = function(ctrl_data, pat_data=NULL, priorpred, postpred,
   par(op)
 }
 
-colvector_gen = function(pts){
-  colind = double(length(pts))
-  pts_B = unique(gsub("_S.", "", pts))
-  for(i in 1:length(pts_B)){
-    colind[ gsub("_S.", "", pts) == pts_B[i] ] = i + 1
-  }
-  colind
-}
 
 pipost_plotter = function(chan, folder, pts, alpha=0.05){
   npat = length(pts)

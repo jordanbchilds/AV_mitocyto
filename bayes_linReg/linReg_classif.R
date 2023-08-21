@@ -12,10 +12,10 @@ modelstring = "
  model {
   # Likelihood of data given model parameters
   for (i in 1:N){
-   class[i] ~ dbern(probdiff)
    Yobs[i] ~ dnorm(Y[i], tau_hat[i])
    Y[i] = m*Xobs[i] + c
-   tau_hat[i] = ifelse(class[i]==1, tau_ctrl, tau_notctrl)
+   tau_hat[i] = ifelse(class[i]==1, tau_notctrl, tau_ctrl)
+   class[i] ~ dbern(probdiff)
   }
   for(j in 1:Nsyn){
    Ysyn[j] ~ dnorm(Ys[j], tau_ctrl)
@@ -28,7 +28,7 @@ modelstring = "
   notctrl_var ~ dgamma(shape_gamma, rate_gamma)
   tau_notctrl = 1/notctrl_var
   p ~ dbeta(alpha, beta)
-  probdiff = ifelse(ctrl_ind==1, 1, p)
+  probdiff = ifelse(ctrl_ind==1, 0, p)
  }
 "
 # inferenecce 
@@ -165,9 +165,9 @@ pts = ptsAll[grepl("P", ptsAll)]
 inputs = list()
 {
   input0 = list()
-  input0$MCMCOut = 2000
-  input0$MCMCBurnin = 1000
-  input0$MCMCThin = 50
+  input0$MCMCOut = 20 # 2000
+  input0$MCMCBurnin = 10# 1000
+  input0$MCMCThin = 1 # 50
   input0$n.chains = 1
   
   for(chan in cord){
