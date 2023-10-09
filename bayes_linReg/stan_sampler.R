@@ -11,7 +11,7 @@ library("data.table")
 library("rstan")
 source("stan_sampler_function.R", local=TRUE)
 
-folder = "stan_sampler_multiChain_truncZero"
+folder = "stan_sampler_multiChain"
 
 dir.create(file.path("Output"), showWarnings = FALSE)
 dir.create(file.path("Output", folder), showWarnings = FALSE)
@@ -154,7 +154,7 @@ for (chan in channels) {
       MCMCburnin = 1000,
       MCMCout = 10000,
       MCMCthin=1,
-      nChains=10,
+      nChains=2,
       max_logLik=FALSE,
       parameterVals = paramVals,
       nCores=1
