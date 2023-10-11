@@ -91,6 +91,7 @@ inter_var = 1 / rep(50, nChan)
 names(grad_var) = channels
 names(inter_var) = channels
 
+data_list = list()
 for (chan in channels) {
   mean_mu_m = grad_mean[chan]
   prec_mu_m = 1/0.25^2
@@ -132,7 +133,6 @@ for (chan in channels) {
     slope_lb = 0.1
   )
   
-  data_list = list()
   for (i in seq_along(pts)) {
     data_list[[paste(chan, pts[i], sep = "__")]] = getData_mats(
       data,
