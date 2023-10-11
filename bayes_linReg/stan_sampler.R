@@ -141,32 +141,32 @@ for (chan in channels) {
       ctrlID = ctrlID,
       getIndex = TRUE
     )
-  }
-  
-  ncores = detectCores() - 1
-  cl  = makeCluster(ncores)
-  {
-    clusterExport(cl, c("stan"))
-    output = parLapply(
-      cl,
-      data_list,
-      stan_inference,
-      MCMCburnin = 1000,
-      MCMCout = 10000,
-      MCMCthin=1,
-      nChains=2,
-      max_logLik=FALSE,
-      parameterVals = paramVals,
-      nCores=1
-    )
-  }
-  stopCluster(cl)
-
-  for( rt in names(output) ){
-    list_saver(output[[rt]], file.path("Output", folder, rt))
+    data_list[[paste(chan, pts[i], sep="__")]]$parameterVals = paramVals
   }
 }
 
+ncores = detectCores() - 1
+cl  = makeCluster(ncores)
+{
+  clusterExport(cl, c("stan"))
+  output = parLapply(
+    cl,
+    data_list,
+    stan_inference,
+    MCMCburnin = 1000,
+    MCMCout = 10000,
+    MCMCthin=1,
+    nChains=5,
+    max_logLik=FALSE,
+    nCores=1
+  )
+}
+stopCluster(cl)
+
+
+for( rt in names(output) ){
+  list_saver(output[[rt]], file.path("Output", folder, rt))
+}
 
 
 

@@ -1,11 +1,12 @@
 # inferenecce   
-stan_inference = function(dataMats, parameterVals=NULL, MCMCout=1000, 
+stan_inference = function(dataMats, MCMCout=1000, 
                           MCMCburnin=1000, MCMCthin=1, nChains=10, 
                           max_logLik=TRUE, nCores=1){
   
   nCtrl = nrow( dataMats$ctrl )
   nPat = nrow( dataMats$pts )
   nCrl = length( unique( dataMats$indexCtrl) )
+  parameterVals = dataMats$parameterVals
   
   nSyn = 1e3
   xSyn = seq(min(c(dataMats$ctrl[,1], dataMats$pts[,1]))-2, max(c(dataMats$ctrl[,1], dataMats$pts[,1]))+2, length.out=nSyn)
