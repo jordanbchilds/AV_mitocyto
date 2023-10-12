@@ -154,9 +154,9 @@ cl  = makeCluster(ncores)
     data_list,
     stan_inference,
     MCMCburnin = 5000,
-    MCMCout = 20000,
+    MCMCout = 4000,
     MCMCthin=1,
-    nChains=1,
+    nChains=5,
     max_logLik=FALSE,
     nCores=1
   )
