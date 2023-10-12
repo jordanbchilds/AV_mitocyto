@@ -153,10 +153,10 @@ cl  = makeCluster(ncores)
     cl,
     data_list,
     stan_inference,
-    MCMCburnin = 1000,
-    MCMCout = 10000,
+    MCMCburnin = 5000,
+    MCMCout = 20000,
     MCMCthin=1,
-    nChains=5,
+    nChains=1,
     max_logLik=FALSE,
     nCores=1
   )
