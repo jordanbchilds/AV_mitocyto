@@ -128,7 +128,7 @@ for (chan in channels) {
     shape_tau = shape_tau,
     rate_tau = rate_tau, 
     alpha_pi = 0.0,
-    beta_pi = 0.5,
+    beta_pi = 1.0,
     tau_def=tau_def,
     slope_lb = 0.1
   )
