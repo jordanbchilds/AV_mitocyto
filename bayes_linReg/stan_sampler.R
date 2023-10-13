@@ -83,7 +83,7 @@ names(tau_c_vars) = channels
 tau_m_vars = rep(50, nChan)^2
 names(tau_m_vars) = channels
 
-tau_vars = rep(10, nChan)^2 
+tau_vars = rep(20, nChan)^2 
 names(tau_vars) = channels
 
 grad_var =  1 / rep(50, nChan)
