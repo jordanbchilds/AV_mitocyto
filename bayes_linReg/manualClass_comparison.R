@@ -1,6 +1,7 @@
 # --- COMPARISON TO MANUAL CLASSIFICATIONS
 library("data.table")
 library("analysis2Dmito")
+library("tidyr")
 
 mdat = as.data.frame( fread("../dat_with_class.txt") )
 
@@ -40,17 +41,35 @@ tmp_wide = pivot_wider( mdat,
                         names_from=channel, 
                         values_from=value )
 
-tmp_wide_2 = pivot_longer( tmp_wide, )
+tmp_wide$NDUFB8_value = tmp_wide$NDUFB8
+tmp_wide$MTCO1_value = tmp_wide$MTCO1
+tmp_wide$CYB_value = tmp_wide$CYB
+tmp_wide$VDAC_value = tmp_wide$VDAC
 
-tmp_wide$mclass = tmp_wide$NDUFB8_MCLASS_DEFICIENT | tmp_wide$NDUFB8_MCLASS_OVEREXP
+tmp_wide$NDUFB8 = NULL
+tmp_wide$MTCO1 = NULL
+tmp_wide$CYB = NULL
+tmp_wide$VDAC = NULL
 
-newdat = mdat[mdat$channel %in% c(mitochan, chan), ]
+tmp_wide$NDUFB8_diff = as.numeric( tmp_wide$NDUFB8_MCLASS_DEFICIENT | tmp_wide$NDUFB8_MCLASS_OVEREXP)
+tmp_wide$MTCO1_diff = as.numeric( tmp_wide$MTCO1_MCLASS_DEFICIENT | tmp_wide$MTCO1_MCLASS_OVEREXP)
+tmp_wide$CYB_diff = as.numeric( tmp_wide$CYB_MCLASS_DEFICIENT | tmp_wide$CYB_MCLASS_OVEREXP)
 
-newdat$V1 = NULL
-newdat$mclass = 0
+tmp_wide$NDUFB8_MCLASS_DEFICIENT = NULL
+tmp_wide$NDUFB8_MCLASS_OVEREXP = NULL
+tmp_wide$MTCO1_MCLASS_DEFICIENT = NULL
+tmp_wide$MTCO1_MCLASS_OVEREXP = NULL
+tmp_wide$CYB_MCLASS_DEFICIENT = NULL
+tmp_wide$CYB_MCLASS_OVEREXP = NULL
+
+tmp_wide$cell_id = NULL
+
+tmp_wide_2 = pivot_longer(tmp_wide, cols=!c("id", "patient_type", "patient_id"), names_to=c("channel", ".value"), names_sep="_")
+
+tmp_wide_2$cell_id = paste0(tmp_wide_2$channel, "_", tmp_wide_2$id)
 
 
+colnames(tmp_wide_2) = c("id", "patient_type", "patient_id", "channel", "value", "jbcClass", "cell_id")
 
-
-
+write.table(tmp_wide_2, file="../dat_manClass_prepped.txt", sep="\t", row.names=FALSE)
 
