@@ -12,7 +12,8 @@ functions{
   // sample from truncated normal distribution - lower truncated
   real normal_lb_rng(real mu, real sigma, real lb){
     real p_lb = normal_cdf(lb, mu, sigma);
-    real u = uniform_rng(p_lb, 1.0);
+    real u = (p_lb < 1) ? uniform_rng(p_lb, 1) : 1 ;
+    // real u = uniform_rng(p_lb, 1.0);
     real y = mu + sigma*Phi(u);
     return y;
   }
@@ -107,7 +108,7 @@ generated quantities{
   real c_pred;
 
   // prior draws
-  vector<lower=0>[M] m_prior; 
+  vector[M] m_prior; 
   vector[M] c_prior; 
   real<lower=0> tau_norm_prior;
   real mu_m_prior;
@@ -118,9 +119,6 @@ generated quantities{
   vector[nSyn] yPred_prior;
   real m_pred_prior;
   real c_pred_prior;
-  
-  // the log-likelihood
-  real log_lik;
   
   // classifier
   log_probDef_tmp = log(probdiff);
@@ -158,15 +156,6 @@ generated quantities{
   for(k in 1:nSyn){
     yPred[k] = normal_rng( m[M]*xSyn[k]+c[M], sigma_norm_tmp );
     yPred_prior[k] = normal_rng( m_prior[M]*xSyn[k]+c_prior[M], 1/sqrt(tau_norm_prior) );
-  }
-  
-  // the log-likelihood
-  log_lik = 0.0;
-  for(i in 1:nCtrl){
-    log_lik += normal_lpdf(ctrl_mat[i,2] | m[ctrlIndex[i]]*ctrl_mat[i,1]+c[ctrlIndex[i]], sigma_norm_tmp) ;
-  }
-  for(j in 1:nPat){
-    log_lik += classif[j] ? normal_lpdf(pat_mat[j,2] | m[M]*pat_mat[j,1]+c[M], sigma_def_tmp) : normal_lpdf(pat_mat[j,2] | m[M]*pat_mat[j,1]+c[M], sigma_norm_tmp);
   }
 }
 
