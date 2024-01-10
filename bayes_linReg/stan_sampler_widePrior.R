@@ -7,7 +7,7 @@ library("tidyr")
 library("data.table")
 library("rstan")
 
-folder = "stan_sampler_wide"
+folder = "stan_sampler_wide2"
 
 dir.create(file.path("Output"), showWarnings = FALSE)
 dir.create(file.path("Output", folder), showWarnings = FALSE)
@@ -31,6 +31,7 @@ sbj = unique(data$sampleID)
 ctrlID = grep("C", sbj, value=TRUE)
 pts = sbj[!(sbj %in% ctrlID)]
 
+priorInflate = 10
 {
   grad = matrix(NA, nrow=length(channels), ncol=length(ctrlID))
   colnames(grad) = ctrlID
@@ -62,13 +63,13 @@ pts = sbj[!(sbj %in% ctrlID)]
   inter_var = apply(inter, 1, var)
   prec_var = apply(prec, 1, var)
   
-  tau_c_vars = rep(50, nChan)^2 *10
+  tau_c_vars = rep(50, nChan)^2 *priorInflate
   names(tau_c_vars) = channels
   
-  tau_m_vars = rep(50, nChan)^2 *10
+  tau_m_vars = rep(50, nChan)^2 *priorInflate
   names(tau_m_vars) = channels
   
-  tau_vars = rep(10, nChan)^2 *10
+  tau_vars = rep(10, nChan)^2 *priorInflate
   names(tau_vars) = channels
   
   grad_prec =  rep(50, nChan)
@@ -79,10 +80,10 @@ pts = sbj[!(sbj %in% ctrlID)]
 
 for (chan in channels) {
   mean_mu_m = grad_mean[chan]
-  prec_mu_m = 1/0.5^2
+  prec_mu_m = 1/0.25^2 * (1/priorInflate)
   
   mean_mu_c = inter_mean[chan]
-  prec_mu_c = 1/0.5^2
+  prec_mu_c = 1/0.25^2 * (1/priorInflate)
   
   tau_m_mode = grad_prec[chan]
   tau_m_var = tau_m_vars[chan]
@@ -99,7 +100,7 @@ for (chan in channels) {
   rate_tau = 0.5*(tau_mode + sqrt(tau_mode^2+4*tau_var)) / tau_var
   shape_tau = 1 + tau_mode*rate_tau
   
-  tau_def = 0.01
+  tau_def = 0.0001
   
   paramVals = list(
     mean_mu_m=mean_mu_m, 
@@ -129,7 +130,8 @@ for (chan in channels) {
     )
   }
   
-  ncores = 8
+  # ncores = 8
+  ncores = detectCores() - 4
   cl  = makeCluster(ncores)
   {
     output = parLapply(
@@ -147,3 +149,5 @@ for (chan in channels) {
     list_saver(output[[rt]], file.path("Output", folder, rt), rootSep="_")
   }
 }
+
+

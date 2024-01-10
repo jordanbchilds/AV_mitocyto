@@ -161,6 +161,7 @@ dev.off()
 # --- bayes classification example
 png("./PDF/paper/bayes_example.png", width=9, height=3, units="in", res=300, pointsize=11)
 {
+  pat = "P09"
   op = par(mfrow=c(1,3), mar=c(5,5,2,1))
   for( chan in channels ){
     bayes_class_mat = as.matrix( fread( paste0("./Output/stan_sampler/", chan, "__", pat, "_CLASSIF.txt") ) )
@@ -202,7 +203,7 @@ png("./PDF/paper/bayes_example.png", width=9, height=3, units="in", res=300, poi
 }
 dev.off()
 
-# --- prior-posteriors all n one
+# --- prior-posteriors all in one
 png("./PDF/paper/prior_post.png", width=9, height=3*4, units="in", res=300, pointsize=11)
 {
   pat = "P09"
@@ -213,6 +214,8 @@ png("./PDF/paper/prior_post.png", width=9, height=3*4, units="in", res=300, poin
   post = as.data.frame( fread( paste0("./Output/stan_sampler/", chan, "__", pat, "_POST.txt") ) )
   prior = as.data.frame( fread( paste0("./Output/stan_sampler/", chan, "__", pat, "_PRIOR.txt") ) )
   
+  xlb = list(probdiff=bquote(pi), tau_norm=bquote(tau))
+  names(xlb) = c("probdiff", "tau_norm")
   for(para in c("probdiff", "tau_norm")){
     dpost = density(post[,para])
     dprior = density(prior[,para])
@@ -264,168 +267,48 @@ png("./PDF/paper/prior_post.png", width=9, height=3*4, units="in", res=300, poin
 }
 dev.off()
 
-# --- different gamma
-png("./PDF/paper/postComp_gamma.png", width=9, height=3, units="in", res=300, pointsize=11)
-{
-  op = par(mfrow=c(1,3), mar=c(5,5,1,1))
-  chan = "NDUFB8"
-  pat = "P09"
-  root = paste0(chan, "_", pat)
-  
-  tau_defs = c("000001", "00001", "0001", "001", "01", "10")
-  
-  post_list = list(m = list(), 
-                   c = list(), 
-                   tau = list())
-  
-  m_ylm = NULL; c_ylm = NULL; tau_ylm = NULL;
-  m_xlm = NULL; c_xlm = NULL; tau_xlm = NULL;
-  
-  for(i in 1:length(tau_defs)){
-    tau_str = as.character(tau_defs[i])
-    fn_post = file.path("Output", 
-                        paste0("stan_sampler_gamma", gsub("\\.", "", tau_str)),
-                        paste0(root, "_POST.txt"))
-    post = as.data.frame( fread(fn_post) )
-    post_list$m[[i]] = density( post[,"m[5]"] )
-    post_list$c[[i]] = density( post[,"c[5]"] )
-    post_list$tau[[i]] = density( post[,"tau_norm"] )
-    
-    m_ylm = range(c(m_ylm, range(post_list$m[[i]]$y)))
-    c_ylm = range(c(c_ylm, range(post_list$c[[i]]$y)))
-    tau_ylm = range(c(tau_ylm, range(post_list$tau[[i]]$y)))
-    
-    m_xlm = range(c(m_xlm, range(post_list$m[[i]]$x)))
-    c_xlm = range(c(c_xlm, range(post_list$c[[i]]$x)))
-    tau_xlm = range(c(tau_xlm, range(post_list$tau[[i]]$x)))
-  }
-  
-  plot(NA, xlim=m_xlm, ylim=m_ylm, xlab="Slope", ylab="Density")
-  for(i in 1:length(tau_defs)){
-    lines( post_list$m[[i]], col=i)
-  }
-  legend("topleft", 
-         lty=1, col=1:length(tau_defs), 
-         legend=tau_defs)
-  
-  plot(NA, xlim=c_xlm, ylim=c_ylm, xlab="Intercept", ylab="Density")
-  for(i in 1:length(tau_defs)){
-    lines( post_list$c[[i]], col=i)
-  }
-  
-  plot(NA, xlim=tau_xlm, ylim=tau_ylm, xlab="tau", ylab="Density")
-  for(i in 1:length(tau_defs)){
-    lines( post_list$tau[[i]], col=i)
-  }
-}
-dev.off()
-
-
-
-# --- freq, bayes, manual comparison of pi
-
-mdat = as.data.frame( fread( "./dat_manClass_prepped.txt") )
-
-pi_list = list()
-piFreq_list = list()
-piMan_list = list()
-for(pat in pts){
-  for( chan in channels ){
-    root = paste0(chan, "__", pat)
-    fn_post = file.path("Output", folder, paste0(root, "_POST.txt"))
-    post = as.matrix( fread( fn_post ))
-    pi_list[[root]] = post[, "probdiff"]
-    fn_freqClass = file.path("Output", "frequentist_linReg", paste0(root, "_CLASSIF.txt"))
-    freqClass = as.matrix( fread(fn_freqClass) )
-    piFreq_list[[root]] = mean( freqClass )
-    manClass = mdat[ mdat$channel==chan & mdat$patient_id==pat, grep("Class", colnames(mdat))]
-    piMan_list[[root]] = mean(manClass)
-  }
-}
-
-png("./PDF/paper/proportion_comparison.png", width=9, height=6, units="in", res=300, pointsize=11)
-{
-  op = par(mar=c(4,4,1,9), xpd=TRUE)
-  
-  colVec = c(alphaCol(0.05, name="lightseagreen"), 
-             alphaCol(0.05, name="deeppink3"), 
-             alphaCol(0.05, name="darkorange"))
-    
-  myAt = c(1:44)[ 1:44 %% 4 !=0 ]
-  myTicks = 4* 1:11 - 2
-  plot(NA, xlim=c(1,43), ylim=c(0,1), xaxt="n", 
-       ylab="Deficient Proportion", xlab="Patient")
-  
-  for(i in seq(0,10, by=2)) rect( xleft=i*4, xright=(i+1)*4, ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, col=alphaBlack(0.1))
-    stripchart(pi_list, vertical=TRUE, pch=20, cex=0.5, 
-               method="jitter", main="", ylim=c(0,1), xlim=c(1,43),
-               xlab="Patient", ylab="Deficient Proportion", 
-               col=rep(colVec, length(pi_list)), 
-               at=myAt, xaxt="n", add=TRUE)
-    axis(side=1, at=myTicks, labels=pts)
-    points(myAt, unlist(piFreq_list), pch=23, 
-           bg=rep(c(alphaCol(0.7, name="lightseagreen"), 
-                    alphaCol(0.7, name="deeppink3"), 
-                    alphaCol(0.7, name="darkorange")), length(pi_list)), 
-           col="black",
-           cex=0.8)
-    points(myAt, unlist(piMan_list), pch=25, 
-           bg=rep(c(alphaCol(0.7, name="lightseagreen"), 
-                    alphaCol(0.7, name="deeppink3"), 
-                    alphaCol(0.7, name="darkorange")), length(pi_list)),
-           col="black",
-           cex=0.8)
-    legend("topleft", 
-           inset=c(1.025, 0), 
-           legend=c("Bayesian est.", "Frequentist est.", "Mannual est."), 
-           pch=c(21, 23, 25), 
-           col=c(alphaBlack(1.0), alphaBlack(1.0), alphaBlack(1.0)))
-    legend("topleft", 
-           inset=c(1.025, 0.17), 
-           legend=channels, 
-           pch=20, 
-           col=c(alphaCol(0.7, name="lightseagreen"), 
-                 alphaCol(0.7, name="deeppink3"), 
-                 alphaCol(0.7, name="darkorange")))
-    par(op)
-}
-dev.off()
 
 # --- better comparison of classifs
+install.packages("HDInterval")
+library("HDInterval")
 
 mdat = as.data.frame( fread( file.path("../dat_with_class_prepped.txt") ) )
 
+bayes_post = list()
 bayes_diff = list()
+bayes_mean = list()
 freq_diff = list()
-for( chan in channels ){
-  for( pat in pts ){
+nonZero = list()
+for( pat in pts ){
+  for( chan in channels ){
     root = paste0(chan, "__", pat)
+    
     fn_post = file.path("Output", folder, paste0(root, "_POST.txt"))
     probdiff_post = as.data.frame( fread( fn_post ))[,"probdiff"]
     
-    man_est = mean( mdat[ mdat$patient_id==pat & mdat$channel==chan, "jbcClass"] )
+    man_est = mean( unlist(mdat[ mdat$patient_id==pat & mdat$channel==chan, "classJBC"]) )
+    
+    diff_vec = probdiff_post - man_est
     
     fn_freq = file.path("Output", "frequentist_linReg", paste0(root, "_CLASSIF.txt"))
     freq_class = as.data.frame( fread( fn_freq ) )
     
-    bayes_diff[[root]] = probdiff_post - man_est
-    freq_diff[[root]] = mean( freq_class[,1] )
+    bayes_post[[root]] = probdiff_post
+    bayes_diff[[root]] = diff_vec
+    bayes_mean[[root]] = mean(diff_vec)
+    freq_diff[[root]] = mean( freq_class[,1] ) - man_est
+    diff_hdi = hdi(diff_vec, credMass = 0.95)
+    nonZero[[root]] = (diff_hdi["lower"]>0.0) | (diff_hdi["upper"]<0.0)
   }
 }
-
-stripchart(bayes_diff, vertical=TRUE, pch=20, cex=0.2, col=alphaBlack(0.01), method="jitter",
-           ylim=c(-0.05, 1.0))
-stripchart(freq_diff, vertical=TRUE, pch=23, cex=0.4, col=alphaRed(1.0), 
-           method="jitter", add=TRUE)
-abline( h=0, col="red", lty=3)
 
 png("./PDF/paper/proportion_comparison_better.png", width=9, height=6, units="in", res=300, pointsize=11)
 {
   op = par(mar=c(4,4,1,9), xpd=TRUE)
   
-  colVec = c(alphaCol(0.05, name="lightseagreen"), 
-             alphaCol(0.05, name="deeppink3"), 
-             alphaCol(0.05, name="darkorange"))
+  colVec = c(alphaCol(0.01, name="lightseagreen"), 
+             alphaCol(0.01, name="deeppink3"), 
+             alphaCol(0.01, name="darkorange"))
   
   myAt = c(1:44)[ 1:44 %% 4 !=0 ]
   myTicks = 4* 1:11 - 2
@@ -433,37 +316,522 @@ png("./PDF/paper/proportion_comparison_better.png", width=9, height=6, units="in
        ylab="Difference from manual classification", xlab="Patient")
   
   for(i in seq(0,10, by=2)) rect( xleft=i*4, xright=(i+1)*4, ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, col=alphaBlack(0.1))
+  lines(x=c(0,44), c(0,0), lty=3, col="black", lwd=3)
+  
   stripchart(bayes_diff, vertical=TRUE, pch=20, cex=0.5, 
              method="jitter", main="", ylim=c(0,1), xlim=c(1,43),
              xlab="Patient", ylab="Deficient Proportion", 
              col=rep(colVec, length(bayes_diff)), 
              at=myAt, xaxt="n", add=TRUE)
   axis(side=1, at=myTicks, labels=pts)
-  points(myAt, unlist(freq_diff), pch=17, cex=1.2,
-         col=rep(c(alphaCol(0.9, name="lightseagreen"), 
+  points(myAt, unlist(freq_diff), pch=24, cex=1.2,
+         col="black",
+         bg=rep(c(alphaCol(0.9, name="lightseagreen"), 
                    alphaCol(0.9, name="deeppink3"), 
                    alphaCol(0.9, name="darkorange")), length(freq_diff)))
-  lines(x=c(0,44), c(0,0), lty=3, col="black", lwd=3)
-  legend("topleft", 
-         inset=c(1.025, 0), 
+  #points(x=myAt[unlist(nonZero)], y=rep(-0.1, sum(unlist(nonZero))), pch=8)
+  legend(x=45, y=0.99, 
+         # inset=c(0, 0), 
          legend=channels, 
-         title="Bayesian",
+         # title="Bayesian\ndistributions",
+         #title.adj=0.1, 
+         box.col=alphaBlack(0.0),
+         text.width = 10,
          pch=20, 
          col=c(alphaCol(0.7, name="lightseagreen"), 
                alphaCol(0.7, name="deeppink3"), 
                alphaCol(0.7, name="darkorange")))
-  legend("topleft", 
-         inset=c(1.025, 0.21), 
+  text(x=45, y=1.0, labels=c("Bayesian distribution"), pos=4)
+  rect(xleft=45, xright=55.7, 
+       ybottom=0.82, ytop=1.025, 
+       lwd=1, col=NA, border="black")
+  
+  legend(x=45, y=0.725, 
+         inset=c(0.0, 0.0), 
          legend=channels, 
-         title = "Frequentist",?layo
-         pch=17, 
-         col=c(alphaCol(0.7, name="lightseagreen"), 
+         # title = "Frequentist point\nestimate",
+         #title.adj=0.1, 
+         box.col=alphaBlack(0.0), 
+         text.width = 10,
+         pch=24, 
+         col="black",
+         pt.bg=c(alphaCol(0.7, name="lightseagreen"), 
                alphaCol(0.7, name="deeppink3"), 
                alphaCol(0.7, name="darkorange")) )
+  text(x=45, y=0.75, labels=c("Frequentist point\nestimate"), pos=4)
+  rect(xleft=45, xright=55.7, 
+       ybottom=0.56, ytop=0.81, 
+       lwd=1, col=NA, border="black")
   par(op)
 }
 dev.off()
 
+# --- gamma comparison - MEAN ABSOLUTE DIFFERENCE
+mad = list()
+gamma_labs = c("000001", "00001", "0001", "001", "01", "10")
+gamma_vals = c("0.00001", "0.0001", "0.001", "0.01", "0.1", "1.0")
+
+for( gam in gamma_labs){
+  fldr = paste0("stan_sampler_gamma", gam)
+  diffs = NULL
+  for( pat in pts ){
+    for( chan in channels ){
+      mclass = unlist( mdat[ mdat$channel==chan & mdat$patient_id==pat, "classJBC"] )
+      root = paste0(chan, "__", pat)
+      fn_post = file.path("Output", fldr, paste0(root, "_POST.txt"))
+      
+      post = as.matrix( fread( fn_post) )
+      diffs = c(diffs, abs(post[,"probdiff"] - mean(mclass)))
+    }
+  }
+  mad[[gam]] = mean(diffs)
+}
+
+png("./PDF/paper/gamma_comparison.png", width=6, height=4, units="in", res=300, pointsize=11)
+{
+  op = par(mfrow=c(1,1), mar=c(6,4,2,2))
+  plot(1:length(gamma_vals), unlist(mad), ylim=c(0,0.1),
+       ylab="Mean absolute difference", xlab=bquote(gamma), 
+       xaxt='n',
+       pch=20)
+  axis(side=1, at=1:length(gamma_vals), labels=gamma_vals)
+  
+  par(op)
+}
+dev.off()
+
+# --- COMPARING PI TO THE MANUAL CLASSIFICATION
+
+mdat = fread( "../dat_with_class_prepped.txt" )
+
+pis_diff = list()
+nonZero = list()
+for( gam in c("000001", "00001", "0001", "001", "01")){
+  fldr = paste0("stan_sampler_gamma", gam)
+  pis_diff[[gam]] = list()
+  for( pat in pts ){
+    for( chan in channels ){
+      mclass = unlist( mdat[ mdat$channel==chan & mdat$patient_id==pat, "classJBC"] )
+      root = paste0(chan, "__", pat)
+      fn_post = file.path("Output", fldr, paste0(root, "_POST.txt"))
+      
+      post = as.matrix( fread( fn_post) )
+      diff_vec = post[,"probdiff"] - mean(mclass)
+      pis_diff[[gam]][[root]] = diff_vec
+      diff_hdi = hdi(diff_vec, ci=0.99)
+      nonZero[[gam]][[root]] = 0.0<(diff_hdi["lower"]) | 0.0>(diff_hdi["upper"])
+    }
+  }
+}
+
+png("./PDF/paper/gamma_comparison.png", width=9, height=6, units="in", res=300, pointsize=11)
+{
+  op = par(mfrow=c(2,1), mar=c(6,4,6,2), xpd=TRUE)
+  gam_lbs = c("0.00001", "0.0001", "0.001", "0.01", "0.1", "1.0")
+  names(gam_lbs) = c("000001", "00001", "0001", "001", "01", "10")
+  
+  colVec = c(alphaCol(0.05, name="lightseagreen"), 
+             alphaCol(0.05, name="deeppink3"), 
+             alphaCol(0.05, name="darkorange"))
+  
+  myAt = c(1:44)[ 1:44 %% 4 !=0 ]
+  myTicks = 4* 1:11 - 2
+  
+  opp = par(mar=c(3,4,1,6), xpd=TRUE)
+  {
+    plot(NA, xlim=c(1,43), ylim=c(-0.1,0.2), 
+         xaxt="n", 
+         ylab="", xlab="", 
+         main="")
+    for(i in seq(0,10, by=2)) rect( xleft=i*4, xright=(i+1)*4, ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, col=alphaBlack(0.1))
+    
+    stripchart(pis_diff[["001"]], vertical=TRUE, pch=20, cex=0.5, 
+               method="jitter", 
+               col=rep(colVec, length(pis_diff)), 
+               at=myAt, xaxt='n',
+               add=TRUE)
+    text(46, 0.05, labels=bquote(gamma*"="*.(gam_lbs["001"])),
+         srt=-90)
+    axis(side=1, at=myTicks, labels=pts)
+    lines(c(0,44), c(0,0), lty=3, col="black", lwd=2)
+    
+    points(x=myAt[unlist(nonZero[["001"]])], y=rep(-0.1, sum(unlist(nonZero[["001"]]))), 
+           pch=8)
+    exact_xlim = par("usr")[1:2]
+    exact_ylim = par("usr")[3:4]
+    
+    legend(exact_xlim[2] + 1.0, exact_ylim[2], 
+           legend=channels, 
+           title = "Channel",
+           pch=20,  cex=0.7, 
+           xpd=TRUE,
+           col=c(alphaCol(0.7, name="lightseagreen"), 
+                 alphaCol(0.7, name="deeppink3"), 
+                 alphaCol(0.7, name="darkorange")) )
+  }
+  par(opp)
+  
+  opp = par(mar=c(4,4,0,6), xpd=TRUE)
+  {
+    plot(NA, xlim=c(1,43), ylim=c(-0.1,0.2), xaxt="n", 
+         ylab="", xlab="Patient",
+         main="")
+    for(i in seq(0,10, by=2)) rect( xleft=i*4, xright=(i+1)*4, ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, col=alphaBlack(0.1))
+    
+    stripchart(pis_diff[["00001"]], vertical=TRUE, pch=20, cex=0.5, 
+               method="jitter",
+               col=rep(colVec, length(pis_diff)), 
+               at=myAt, xaxt="n", add=TRUE)
+    axis(side=1, at=myTicks, labels=pts)
+    text(46, 0.05, labels=bquote(gamma*"="*.(gam_lbs["00001"])),
+         srt=-90)
+    lines(c(0,44), c(0,0), lty=3, col="black", lwd=2)
+    points(x=myAt[unlist(nonZero[["00001"]])], y=rep(-0.1, sum(unlist(nonZero[["00001"]]))), 
+           pch=8)
+  }
+  par(opp)
+  
+  mtext("Difference from manual classification", side=2, line=-1, outer=TRUE, adj=0.6, padj=0.5)
+  
+  par(op)
+}
+dev.off()
+
+# --- comparing priors against manual classifications
+
+folders = c("stan_sampler_wide", "stan_sampler_narrow")
+names(folders) = c("wide", "narrow")
+
+mdat = fread( "../dat_with_class_prepped.txt" )
+
+pis_diff = list()
+for( name in names(folders) ){
+  pis_diff[[name]] = list()
+  for( pat in pts ){
+    for( chan in channels ){
+      mclass = unlist( mdat[ mdat$channel==chan & mdat$patient_id==pat, "classJBC"] )
+      
+      root = paste0(chan, "__", pat)
+      
+      fn_post = file.path("Output", folders[name], paste0(root, "_POST.txt"))
+      
+      post = as.matrix( fread( fn_post) )
+      diff_vec = post[,"probdiff"] - mean(mclass)
+      pis_diff[[name]][[root]] = diff_vec
+    }
+  }
+}
+
+png("./PDF/paper/prior_comparison_with_manual.png", width=9, height=6, units="in", res=300, pointsize=11)
+{
+  op = par(mfrow=c(2,1), mar=c(6,4,6,2), xpd=TRUE)
+  
+  colVec = c(alphaCol(0.05, name="lightseagreen"), 
+             alphaCol(0.05, name="deeppink3"), 
+             alphaCol(0.05, name="darkorange"))
+  
+  myAt = c(1:44)[ 1:44 %% 4 !=0 ]
+  myTicks = 4* 1:11 - 2
+  
+  opp = par(mar=c(3,4,1,6), xpd=TRUE)
+  {
+    plot(NA, xlim=c(1,43), ylim=c(-0.1,0.2), 
+         xaxt="n", 
+         ylab="", xlab="", 
+         main="")
+    for(i in seq(0,10, by=2)) rect( xleft=i*4, xright=(i+1)*4, ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, col=alphaBlack(0.1))
+    
+    stripchart(pis_diff[["wide"]], vertical=TRUE, pch=20, cex=0.5, 
+               method="jitter", 
+               col=rep(colVec, length(pis_diff)), 
+               at=myAt, xaxt='n',
+               add=TRUE)
+    text(46, 0.05, labels="Wide prior", srt=-90)
+    axis(side=1, at=myTicks, labels=pts)
+    lines(c(0,44), c(0,0), lty=3, col="black", lwd=2)
+    exact_xlim = par("usr")[1:2]
+    exact_ylim = par("usr")[3:4]
+    
+    legend(exact_xlim[2] + 1.0, exact_ylim[2], 
+           legend=channels, 
+           title = "Channel",
+           pch=20,  cex=0.7, 
+           xpd=TRUE,
+           col=c(alphaCol(0.7, name="lightseagreen"), 
+                 alphaCol(0.7, name="deeppink3"), 
+                 alphaCol(0.7, name="darkorange")) )
+  }
+  par(opp)
+  
+  opp = par(mar=c(4,4,0,6), xpd=TRUE)
+  {
+    plot(NA, xlim=c(1,43), ylim=c(-0.1,0.2), xaxt="n", 
+         ylab="", xlab="Patient",
+         main="")
+    for(i in seq(0,10, by=2)) rect( xleft=i*4, xright=(i+1)*4, ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, col=alphaBlack(0.1))
+    
+    stripchart(pis_diff[["narrow"]], vertical=TRUE, pch=20, cex=0.5, 
+               method="jitter",
+               col=rep(colVec, length(pis_diff)), 
+               at=myAt, xaxt="n", add=TRUE)
+    axis(side=1, at=myTicks, labels=pts)
+    text(46, 0.05, labels="Narrow prior", srt=-90)
+    lines(c(0,44), c(0,0), lty=3, col="black", lwd=2)
+  }
+  par(opp)
+  
+  mtext("Difference from manual classification", side=2, line=-1, outer=TRUE, adj=0.6, padj=0.5)
+  
+  par(op)
+}
+dev.off()
+
+# --- prior comparison against OG posterior
+
+folders = c("stan_sampler_wide", "stan_sampler_narrow")
+names(folders) = c("wide", "narrow")
+
+pis_diff = list()
+pis_diff[["wide"]] = list()
+pis_diff[["narrow"]] = list()
+for(pat in pts) {
+  for (chan in channels) {
+    root = paste0(chan, "__", pat)
+    
+    fn_post_og = file.path("Output", "stan_sampler", paste0(root, "_POST.txt"))
+    pi_post_og = as.matrix(fread(fn_post_og))[, "probdiff"]
+    
+
+    for (pp in names(folders)) {
+      fn_post_two = file.path("Output", folders[pp], paste0(root, "_POST.txt"))
+      pi_post_two = as.matrix(fread(fn_post_two))[, "probdiff"]
+      pis_diff[[pp]][[root]] = pi_post_og - pi_post_two
+    }
+  }
+}
+
+png("./PDF/paper/prior_comparison.png", width=9, height=6, units="in", res=300, pointsize=11)
+{
+  op = par(mfrow=c(2,1), mar=c(6,4,6,2), xpd=TRUE)
+  
+  colVec = c(alphaCol(0.01, name="lightseagreen"), 
+             alphaCol(0.01, name="deeppink3"), 
+             alphaCol(0.01, name="darkorange"))
+  
+  myAt = c(1:44)[ 1:44 %% 4 !=0 ]
+  myTicks = 4* 1:11 - 2
+  
+  opp = par(mar=c(3,4,1,6), xpd=TRUE)
+  {
+    plot(NA, xlim=c(1,43), ylim=c(-0.2,0.2), 
+         xaxt="n", 
+         ylab="", xlab="", 
+         main="")
+    for(i in seq(0,10, by=2)) rect( xleft=i*4, xright=(i+1)*4, ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, col=alphaBlack(0.1))
+    
+    stripchart(pis_diff[["wide"]], vertical=TRUE, pch=20, cex=0.5, 
+               method="jitter", 
+               col=rep(colVec, length(pis_diff)), 
+               at=myAt, xaxt='n',
+               add=TRUE)
+    text(46, -0.01, labels="Wide prior", srt=-90)
+    axis(side=1, at=myTicks, labels=pts)
+    lines(c(0,44), c(0,0), lty=3, col="black", lwd=2)
+    exact_xlim = par("usr")[1:2]
+    exact_ylim = par("usr")[3:4]
+    
+    legend(exact_xlim[2] + 1.0, exact_ylim[2], 
+           legend=channels, 
+           title = "Channel",
+           pch=20,  cex=0.7, 
+           xpd=TRUE,
+           col=c(alphaCol(0.7, name="lightseagreen"), 
+                 alphaCol(0.7, name="deeppink3"), 
+                 alphaCol(0.7, name="darkorange")) )
+  }
+  par(opp)
+  
+  opp = par(mar=c(4,4,0,6), xpd=TRUE)
+  {
+    plot(NA, xlim=c(1,43), ylim=c(-0.2,0.2), xaxt="n", 
+         ylab="", xlab="Patient",
+         main="")
+    for(i in seq(0,10, by=2)) rect( xleft=i*4, xright=(i+1)*4, ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, col=alphaBlack(0.1))
+    
+    stripchart(pis_diff[["narrow"]], vertical=TRUE, pch=20, cex=0.5, 
+               method="jitter",
+               col=rep(colVec, length(pis_diff)), 
+               at=myAt, xaxt="n", add=TRUE)
+    axis(side=1, at=myTicks, labels=pts)
+    text(46, -0.01, labels="Narrow prior", srt=-90)
+    lines(c(0,44), c(0,0), lty=3, col="black", lwd=2)
+  }
+  par(opp)
+  
+  mtext("Difference distribution", side=2, line=-1, outer=TRUE, adj=0.6, padj=0.5)
+  
+  par(op)
+}
+dev.off()
+
+# --- ALL POSTERIOR PREDICTIVIONS - supplementary
+
+png("./PDF/paper/allPost_classifs_1.png", width=9, height=3*4, units="in", res=300, pointsize=11)
+{
+  op = par(mfrow=c(4,3), mar=c(4,4,2,1), xpd=FALSE)
+  
+  for( pat in pts[1:4] ){
+    for( chan in channels ){
+      root = paste0(chan, "__", pat)
+      fn_post = file.path("Output", "stan_sampler", paste0(root, "_POST.txt"))
+      fn_postpred = file.path("Output", "stan_sampler", paste0(root, "_POSTPRED.txt"))
+      fn_classif = file.path("Output", "stan_sampler", paste0(root, "_CLASSIF.txt"))
+      
+      class_mats = as.matrix( fread(fn_classif) )
+      class = colMeans( class_mats ) 
+      
+      postpred = as.matrix( fread(fn_postpred) )
+      post = as.matrix( fread(fn_post) )
+      pi_mean = round(mean( post[,"probdiff"] ), 3)
+      
+      dataMats = getData_mats(data, channels=c(mitochan, chan), 
+                              pts=pat, ctrlID=ctrlIDs)
+      
+      classif_plot(dataMats, 
+                   classifs = class,
+                   postpred = postpred, 
+                   xlab=paste0("log(", mitochan, ")"), 
+                   ylab=paste0("log(", chan, ")"),
+                   main=bquote("E("*pi*"|Y)="*.(pi_mean)))
+      if( chan == "NDUFB8" ){
+        text(par("usr")[1], par("usr")[4], labels=pat, adj=c(-0.2,1.3), cex=2)
+      }
+    }
+  }
+  par(op)
+}
+dev.off()
+
+png("./PDF/paper/allPost_classifs_2.png", width=9, height=3*4, units="in", res=300, pointsize=11)
+{
+  op = par(mfrow=c(4,3), mar=c(4,4,2,1), xpd=FALSE)
+  
+  for( pat in pts[5:8] ){
+    for( chan in channels ){
+      root = paste0(chan, "__", pat)
+      fn_post = file.path("Output", "stan_sampler", paste0(root, "_POST.txt"))
+      fn_postpred = file.path("Output", "stan_sampler", paste0(root, "_POSTPRED.txt"))
+      fn_classif = file.path("Output", "stan_sampler", paste0(root, "_CLASSIF.txt"))
+      
+      class_mats = as.matrix( fread(fn_classif) )
+      class = colMeans( class_mats ) 
+      
+      postpred = as.matrix( fread(fn_postpred) )
+      post = as.matrix( fread(fn_post) )
+      pi_mean = round(mean( post[,"probdiff"] ), 3)
+      
+      dataMats = getData_mats(data, channels=c(mitochan, chan), 
+                              pts=pat, ctrlID=ctrlIDs)
+      
+      classif_plot(dataMats, 
+                   classifs = class,
+                   postpred = postpred, 
+                   xlab=paste0("log(", mitochan, ")"), 
+                   ylab=paste0("log(", chan, ")"),
+                   main=bquote("E("*pi*"|Y)="*.(pi_mean)))
+      if( chan == "NDUFB8" ){
+        text(par("usr")[1], par("usr")[4], labels=pat, adj=c(-0.2,1.3), cex=2)
+      }
+    }
+  }
+  par(op)
+}
+dev.off()
+
+png("./PDF/paper/allPost_classifs_3.png", width=9, height=3*3, units="in", res=300, pointsize=11)
+{
+  op = par(mfrow=c(3,3), mar=c(4,4,2,1), xpd=FALSE)
+  
+  for( pat in pts[9:11] ){
+    for( chan in channels ){
+      root = paste0(chan, "__", pat)
+      fn_post = file.path("Output", "stan_sampler", paste0(root, "_POST.txt"))
+      fn_postpred = file.path("Output", "stan_sampler", paste0(root, "_POSTPRED.txt"))
+      fn_classif = file.path("Output", "stan_sampler", paste0(root, "_CLASSIF.txt"))
+      
+      class_mats = as.matrix( fread(fn_classif) )
+      class = colMeans( class_mats ) 
+      
+      postpred = as.matrix( fread(fn_postpred) )
+      post = as.matrix( fread(fn_post) )
+      pi_mean = round(mean( post[,"probdiff"] ), 3)
+      
+      dataMats = getData_mats(data, channels=c(mitochan, chan), 
+                              pts=pat, ctrlID=ctrlIDs)
+      
+      classif_plot(dataMats, 
+                   classifs = class,
+                   postpred = postpred, 
+                   xlab=paste0("log(", mitochan, ")"), 
+                   ylab=paste0("log(", chan, ")"),
+                   main=bquote("E("*pi*"|Y)="*.(pi_mean)))
+      if( chan == "NDUFB8" ){
+        text(par("usr")[1], par("usr")[4], labels=pat, adj=c(-0.2,1.3), cex=2)
+      }
+    }
+  }
+  par(op)
+}
+dev.off()
+
+# --- pi posterior - supplementary
+bayes_post = list()
+for( pat in pts ){
+  for( chan in channels ){
+    root = paste0(chan, "__", pat)
+    fn_post = file.path("Output", folder, paste0(root, "_POST.txt"))
+    probdiff_post = as.data.frame( fread( fn_post ))[,"probdiff"]
+    bayes_post[[root]] = probdiff_post
+  }
+}
+
+png("./PDF/paper/piPost.png", width=9, height=6, units="in", res=300, pointsize=11)
+{
+  op = par(mar=c(4,4,1,1), xpd=FALSE)
+  
+  colVec = c(alphaCol(0.01, name="lightseagreen"), 
+             alphaCol(0.01, name="deeppink3"), 
+             alphaCol(0.01, name="darkorange"))
+  
+  myAt = c(1:44)[ 1:44 %% 4 !=0 ]
+  myTicks = 4* 1:11 - 2
+  plot(NA, xlim=c(1,43), ylim=c(0.0,1), xaxt="n", 
+       ylab="Deficiency proportion", xlab="Patient")
+  
+  for(i in seq(0,10, by=2)) rect( xleft=i*4, xright=(i+1)*4, ybottom=par("usr")[3], ytop=par("usr")[4], border=NA, col=alphaBlack(0.1))
+  
+  stripchart(bayes_post, vertical=TRUE, pch=20, cex=0.5, 
+             method="jitter", main="", ylim=c(0,1), xlim=c(1,43),
+             xlab="Patient", ylab="Deficient Proportion", 
+             col=rep(colVec, length(bayes_post)), 
+             at=myAt, xaxt="n", add=TRUE)
+  axis(side=1, at=myTicks, labels=pts)
+  legend("topleft", 
+         bg = "transparent",
+         legend=channels, 
+         box.col=alphaBlack(0.0),
+         text.width = 10,
+         pch=20, 
+         col=c(alphaCol(0.7, name="lightseagreen"), 
+               alphaCol(0.7, name="deeppink3"), 
+               alphaCol(0.7, name="darkorange")))
+  text(x=45, y=1.0, labels=c("Bayesian distribution"), pos=4)
+  rect(xleft=45, xright=55.7, 
+       ybottom=0.82, ytop=1.025, 
+       lwd=1, col=NA, border="black")
+  par(op)
+}
+dev.off()
 
 
 
