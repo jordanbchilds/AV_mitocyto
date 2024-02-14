@@ -1,6 +1,6 @@
 using Pkg;
 
-using Statistics, Random, NamedArrays, DataStructures, CSV, DataFrames, GLM, StatsBase, Distributions, NBInclude;
+using Statistics, Random, NamedArrays, DataStructures, CSV, DataFrames, GLM, StatsBase, Distributions;
 
 function getData_mats(data; mitochan::String, chan::String,
     ctrlID::Vector{String} = String[], pts::Vector{String} = String[], ctrlOnly::Bool = false, getIndex::Bool = true) 
