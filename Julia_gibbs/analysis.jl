@@ -22,11 +22,6 @@ data_lng[!,:sampleID] = convert.(String, data_lng[!,:sampleID])
 ctrlID = ["C01", "C02", "C03", "C04"]
 data_lng[!,:sbjType] = [xx in ctrlID ? "control" : "patient" for xx in data_lng[:,:sampleID]] ;
 
-isControl(sampleID::String) = (sampleID in ctrlID)
-isControl(sampleID::String3) = (sampleID in ctrlID)
-isNotControl(sampleID::String) = !(sampleID in ctrlID)
-isNotControl(sampleID::String3) = !(sampleID in ctrlID);
-
 sbj = unique(data_lng[:,:sampleID])
 pts = filter(isNotControl, sbj) ;
 

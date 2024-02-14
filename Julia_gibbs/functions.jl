@@ -2,6 +2,18 @@ using Pkg;
 
 using Statistics, Random, NamedArrays, DataStructures, CSV, DataFrames, GLM, StatsBase, Distributions;
 
+isControl(sampleID::String) = (sampleID in ctrlID)
+isControl(sampleID::String3) = (sampleID in ctrlID)
+isNotControl(sampleID::String) = !(sampleID in ctrlID)
+isNotControl(sampleID::String3) = !(sampleID in ctrlID);
+
+function mySaver(X::Dict; fileRoot="") 
+    for key in keys(X)
+        df = DataFrame(X[key], names(X[key], 2))
+        CSV.write(fileRoot*string(key)*".csv", df)
+    end
+end
+
 function getData_mats(data; mitochan::String, chan::String,
     ctrlID::Vector{String} = String[], pts::Vector{String} = String[], ctrlOnly::Bool = false, getIndex::Bool = true) 
     if size(ctrlID,1)==0 & ("sbjType" in names(data))
@@ -15,8 +27,8 @@ function getData_mats(data; mitochan::String, chan::String,
         pts = sbj[ [!(x in ctrlID) for x in sbj] ]
     end
 
-    isControl(sampleID::String3) = (sampleID in ctrlID)
-    isNotControl(sampleID::String3) = !(sampleID in ctrlID)
+    isControl(sampleID) = (sampleID in ctrlID)
+    isNotControl(sampleID) = !(sampleID in ctrlID)
     ctrlData = filter(:sampleID => isControl, data)
     
     xCtrl = [] 
