@@ -295,7 +295,7 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
         end
         sq_diff += sum( (theta[mlab[nSbj]] .*xPat[likeCtrl] .+ theta[clab[nSbj]] .- yPat[likeCtrl]) .^2)
         # update tau - the model error for like-control patients
-        theta["tau_norm"] = rand(Gamma( hyperTheta["shape_tau"] + 0.5*(sum(nCtrl) + sum(likeCtrl)), hyperTheta["rate_tau"] + 0.5*sq_diff))
+        theta["tau_norm"] = rand(Gamma( hyperTheta["shape_tau"] + 0.5*(sum(nCtrl) + sum(likeCtrl)), 1/(hyperTheta["rate_tau"] + 0.5*sq_diff) ) )
         
         # update proportion of deficiency
         theta["probdiff"] = rand(Beta( hyperTheta["alpha_pi"] + sum(nlikeCtrl), hyperTheta["beta_pi"] + sum(likeCtrl) ) )
