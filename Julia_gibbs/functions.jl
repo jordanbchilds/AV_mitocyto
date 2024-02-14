@@ -1,10 +1,9 @@
-using Pkg
-Pkg.add("NBInclude")
+using Pkg;
 
 using Statistics, Random, NamedArrays, DataStructures, CSV, DataFrames, GLM, StatsBase, Distributions, NBInclude;
 
 function getData_mats(data; mitochan::String, chan::String,
-    ctrlID = String[], pts = String[], ctrlOnly::Bool = false, getIndex::Bool = true) 
+    ctrlID::Vector{String} = String[], pts::Vector{String} = String[], ctrlOnly::Bool = false, getIndex::Bool = true) 
     if size(ctrlID,1)==0 & ("sbjType" in names(data))
         ctrlID = unique( data[data.sbjType.=="control", :sampleID] )
     elseif size(ctrlID,1)==0 & !("sbjType" in names(data))
@@ -40,12 +39,11 @@ function getData_mats(data; mitochan::String, chan::String,
             return ctrlMat
         end
     else 
-        ptsData = filter(:sampleID=>isNotControl, data)
+        patData = filter(:sampleID=>isNotControl, data)
         xPat = []
         yPat = []
         indexPat = []
         for pat in pts
-            patData = ptsData[ ptsData[:,:sampleID].==pat,:]
             n = sum( patData[:,:Channel].==mitochan ) 
             xPat = [xPat; patData[patData[:,:Channel].==mitochan, "Value"]]
             yPat = [yPat; patData[patData[:,:Channel].==chan, "Value"]]
@@ -88,6 +86,7 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
     ######
     # Calculate hyper-parameter values
     ######
+    
     grad = Vector{Float64}(undef, nCtrl)
     inter = Vector{Float64}(undef, nCtrl)
     prec = Vector{Float64}(undef, nCtrl)
@@ -150,11 +149,11 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
     data_summs["sum_ysq"] = Vector{Float64}(undef, nCtrl)
     data_summs["sum_xy"] = Vector{Float64}(undef, nCtrl)
     for i in 1:nCtrl
-          data_summs["sum_x"][i] = sum(ctrlMat[ctrlIndex.==i,1])
-      data_summs["sum_y"][i] = sum(ctrlMat[ctrlIndex.==i,2])
-      data_summs["sum_xsq"][i] = sum(ctrlMat[ctrlIndex.==i,1].^2)
-      data_summs["sum_ysq"][i] = sum(ctrlMat[ctrlIndex.==i,2].^2)
-      data_summs["sum_xy"][i] = sum(ctrlMat[ctrlIndex.==i,1].*ctrlMat[ctrlIndex.==i,2])
+        data_summs["sum_x"][i] = sum(ctrlMat[ctrlIndex.==i,1])
+        data_summs["sum_y"][i] = sum(ctrlMat[ctrlIndex.==i,2])
+        data_summs["sum_xsq"][i] = sum(ctrlMat[ctrlIndex.==i,1].^2)
+        data_summs["sum_ysq"][i] = sum(ctrlMat[ctrlIndex.==i,2].^2)
+        data_summs["sum_xy"][i] = sum(ctrlMat[ctrlIndex.==i,1].*ctrlMat[ctrlIndex.==i,2])
     end
     
     # data summaries for patient - sums must be calculated during inference
@@ -162,11 +161,11 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
     data_summs["xsq_pat"] = xPat.*xPat
     data_summs["ysq_pat"] = yPat.*yPat
     data_summs["xy_pat"] = xPat.*yPat
-    
 
     ######
     # PRIOR DRAWS
     ######
+    
     # draw from the prior distributions
     paramNames = reduce(vcat, (["tau_c", "tau_m", "mu_c", "mu_m"], clab, mlab, ["tau_norm", "probdiff", "m_pred", "c_pred"]))
     nParam = length(paramNames)
@@ -188,6 +187,7 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
 
     prior[:, "c_pred"] = rand.(Normal.(prior[:,"mu_c"], 1 ./sqrt.(prior[:,"tau_c"]))) 
     prior[:, "m_pred"] = rand.(Normal.(prior[:,"mu_m"], 1 ./sqrt.(prior[:,"tau_m"]))) 
+
     
     ############
     ######
@@ -249,7 +249,7 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
         theta["mu_c"] = rand(Normal( (hyperTheta["mean_mu_c"]*hyperTheta["prec_mu_c"]+sum(theta[clab])*theta["tau_c"] )/muc_prec, 1/sqrt(muc_prec)))
         # update mu_m - expected slope
         mum_prec = hyperTheta["prec_mu_m"] + theta["tau_m"]*nSbj
-        theta["mu_m"] = rand(Normal( (hyperTheta["mean_mu_m"]*hyperTheta["prec_mu_m"]+sum(theta[mlab])*theta["tau_m"] )/mum_prec, 1/sqrt(mum_prec)))
+        theta["mu_m"] = rand(Normal( (hyperTheta["mean_mu_m"]*hyperTheta["prec_mu_m"]+sum(theta[mlab])*theta["tau_m"] )/mum_prec, 1/sqrt(mum_prec)) )
         
         # update c_i - the intercept for the control subjects
         for i in 1:nCtrl 
@@ -310,16 +310,44 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
             outCount += 1
         end
     end
+    
+    ######
+    ### PREDICTIVE INTERVALS
+    ######
+    
+    # only "care" about predictive interval of patient 
+    p = (0.025, 0.5, 0.975)
+    
+    postpred = Matrix{Float64}(undef, nSyn, 4)
+    m_post = post[:,mlab[nSbj]]
+    c_post = post[:,clab[nSbj]]
+    tau_post = post[:,"tau_norm"]
+    
+    priorpred = Matrix{Float64}(undef, nSyn, 4)
+    m_prior = prior[:,mlab[nSbj]]
+    c_prior = prior[:,clab[nSbj]]
+    tau_prior = prior[:,"tau_norm"]
 
-    output = Dict{String, NamedArray}()
+    
+    for j in 1:nSyn
+        postpred_x = rand.(Normal.(m_post .*xSyn[j] .+ c_post, 1 ./sqrt.(tau_post) ))
+        priorpred_x = rand.(Normal.(m_prior .*xSyn[j] .+ c_prior, 1 ./sqrt.(tau_prior) ))
+        postpred[j,:] = [xSyn[j]; collect(quantile(postpred_x, p))]
+        priorpred[j,:] = [xSyn[j];  collect(quantile(priorpred_x, p))]
+    end
+
+    postpred_named = NamedArray( postpred )
+    priorpred_named = NamedArray( priorpred )
+    
+    setnames!(postpred_named, ["mitochan", "lwr", "med", "upr"], 2)
+    setnames!(priorpred_named, ["mitochan", "lwr", "med", "upr"], 2)
+    
+    output = Dict()
     output["POST"] = post
     output["PRIOR"] = prior
+    output["POSTPRED"] = postpred_named
+    output["PRIORPRED"] = priorpred_named
     output["CLASSIF"] = classifs_mat
+    
     return output
-end
-
-function mySaver(dict::Dict{String, NamedArray}; fileRoot::String="")
-    for key in keys(dict)
-        CSV.write(fileRoot*string(key)*".csv", DataFrame(dict[key].array, names(dict[key], 2)))
-    end
 end

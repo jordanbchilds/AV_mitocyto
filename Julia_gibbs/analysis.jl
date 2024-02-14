@@ -1,5 +1,4 @@
 using Pkg
-Pkg.add("NBInclude")
 
 using Statistics, Random, NamedArrays, DataStructures, CSV, DataFrames, GLM, StatsBase, Distributions, NBInclude;
 
@@ -30,22 +29,20 @@ isNotControl(sampleID::String3) = !(sampleID in ctrlID);
 sbj = unique(data_lng[:,:sampleID])
 pts = filter(isNotControl, sbj) ;
 
-mkdir("Output") ;
+if isfile("Output") 
+    mkdir("Output")
+end
 
 for chan in channels
     Threads.@threads for pat in pts
         root = chan*"_"*pat
         dd = getData_mats(data_lng; mitochan="VDAC", chan=chan, pts=[pat])
-        output::Dict{String, NamedArray} = gibbs_sampler(dd, warmup=100, iter=50)
-        mySaver(output, fileRoot=string("Output/"*root*"__") )
+        # output::Dict{String, NamedArray} = gibbs_sampler(dd, warmup=20000, iter=1000)
+        # mySaver(output, fileRoot=string("Output/"*root*"__") )
         
-        # Threads.@threads for i in 1:1
-        #    output::Dict{String, NamedArray} = gibbs_sampler(dd, warmup=100, iter=50)
-        #    mySaver(output, fileRoot=string("Output/"*root *"_chain_"*lpad(i, 2, "0")*"_") )
-        # end
+        Threads.@threads for i in 1:10
+            output::Dict{String, NamedArray} = gibbs_sampler(dd, warmup=1000000, iter=50000)
+            mySaver(output, fileRoot=string("Output/"*root *"_chain_"*lpad(i, 2, "0")*"__") )
+        end
     end
 end
-
-Threads.nthreads()
-
-nbexport("analysis.jl", "analysis.ipynb")
