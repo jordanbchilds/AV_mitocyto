@@ -36,7 +36,7 @@ function getData_mats(data; mitochan::String, chan::String,
     indexCtrl = []
     ind = 1
     for ctrl in ctrlID
-        crlData = ctrlData[ ctrlData[:,:sampleID].==ctrl, :]
+        crlData = filter(:sampleID => id->id==ctrl, ctrlData)
         n = sum( crlData[:,:Channel].==mitochan ) 
         xCtrl = [xCtrl; crlData[crlData[:,:Channel].==mitochan, "Value"]]
         yCtrl = [yCtrl; crlData[crlData[:,:Channel].==chan, "Value"]]
@@ -51,11 +51,12 @@ function getData_mats(data; mitochan::String, chan::String,
             return ctrlMat
         end
     else 
-        patData = filter(:sampleID=>isNotControl, data)
+        ptsData = filter(:sampleID=>isNotControl, data)
         xPat = []
         yPat = []
         indexPat = []
         for pat in pts
+            patData = filter(:sampleID => id->id==pat, ptsData)
             n = sum( patData[:,:Channel].==mitochan ) 
             xPat = [xPat; patData[patData[:,:Channel].==mitochan, "Value"]]
             yPat = [yPat; patData[patData[:,:Channel].==chan, "Value"]]
@@ -295,7 +296,7 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
         end
         sq_diff += sum( (theta[mlab[nSbj]] .*xPat[likeCtrl] .+ theta[clab[nSbj]] .- yPat[likeCtrl]) .^2)
         # update tau - the model error for like-control patients
-        theta["tau_norm"] = rand(Gamma( hyperTheta["shape_tau"] + 0.5*(sum(nCtrl) + sum(likeCtrl)), 1/(hyperTheta["rate_tau"] + 0.5*sq_diff) ) )
+        theta["tau_norm"] = rand(Gamma( hyperTheta["shape_tau"] + 0.5*(sum(nCtrl) + sum(likeCtrl)), 1/(hyperTheta["rate_tau"] + 0.5*sq_diff)))
         
         # update proportion of deficiency
         theta["probdiff"] = rand(Beta( hyperTheta["alpha_pi"] + sum(nlikeCtrl), hyperTheta["beta_pi"] + sum(likeCtrl) ) )

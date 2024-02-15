@@ -22,22 +22,20 @@ data_lng[!,:sampleID] = convert.(String, data_lng[!,:sampleID])
 ctrlID = ["C01", "C02", "C03", "C04"]
 data_lng[!,:sbjType] = [xx in ctrlID ? "control" : "patient" for xx in data_lng[:,:sampleID]] ;
 
-sbj = unique(data_lng[:,:sampleID])
-pts = filter(isNotControl, sbj) ;
+sbjIDs = unique(data_lng[:,:sampleID])
+ctrlIDs = filter(isControl, sbjIDs)
+ptsIDs = filter(isNotControl, sbjIDs) ;
 
 if isfile("Output")
     mkdir("Output")
 end
 
 for chan in channels
-    Threads.@threads for pat in pts
+    Threads.@threads for pat in ptsIDs
         root = chan*"_"*pat
-        dd = getData_mats(data_lng; mitochan="VDAC", chan=chan, pts=[pat])
-        # output::Dict{String, NamedArray} = gibbs_sampler(dd, warmup=20000, iter=1000)
-        # mySaver(output, fileRoot=string("Output/"*root*"__") )
-        
-        Threads.@threads for i in 1:10
-           output::Dict{String, NamedArray} = gibbs_sampler(dd, warmup=100000, iter=20000)
+        dd = getData_mats(data_lng; mitochan="VDAC", chan=chan, pts=[pat], ctrlID=ctrlIDs)
+        Threads.@threads for i in 1:5
+           output::Dict{String, NamedArray} = gibbs_sampler(dd, warmup=400000, iter=20000)
            mySaver(output, fileRoot=string("Output/"*root *"_chain_"*lpad(i, 2, "0")*"_") )
         end
     end
