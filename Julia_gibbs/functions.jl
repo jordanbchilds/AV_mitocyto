@@ -252,17 +252,21 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
     ######
     outCount = 1
     for tt in 1:iterTotal 
+        sum_likeCtrl = sum(likeCtrl)
+        sum_nlikeCtrl = nPat - sum_likeCtrl
+
         # update tau_c - intercept precision
-        theta["tau_c"] = rand(Gamma(hyperTheta["shape_tau_c"]+nSbj/2, 1/(hyperTheta["rate_tau_c"] + 0.5*sum((theta["mu_c"] .- theta[clab]).^2)) ) )
+        theta["tau_c"] = rand(Gamma(hyperTheta["shape_tau_c"]+nSbj/2, 1/(hyperTheta["rate_tau_c"] + 0.5*sum( (theta["mu_c"] .- theta[clab]).^2)) ) )
         # update tau_m - slope precision
         theta["tau_m"] = rand(Gamma(hyperTheta["shape_tau_m"]+nSbj/2, 1/(hyperTheta["rate_tau_m"] + 0.5*sum((theta["mu_m"] .- theta[mlab]).^2)) ))
-        
+
         # update mu_c - expected intercept
         muc_prec = hyperTheta["prec_mu_c"] + theta["tau_c"]*nSbj
-        theta["mu_c"] = rand(Normal( (hyperTheta["mean_mu_c"]*hyperTheta["prec_mu_c"]+sum(theta[clab])*theta["tau_c"] )/muc_prec, 1/sqrt(muc_prec)))
+        theta["mu_c"] = rand(Normal( (hyperTheta["mean_mu_c"]*hyperTheta["prec_mu_c"] + sum(theta[clab])*theta["tau_c"] )/muc_prec, 1/sqrt(muc_prec)))
+
         # update mu_m - expected slope
         mum_prec = hyperTheta["prec_mu_m"] + theta["tau_m"]*nSbj
-        theta["mu_m"] = rand(Normal( (hyperTheta["mean_mu_m"]*hyperTheta["prec_mu_m"]+sum(theta[mlab])*theta["tau_m"] )/mum_prec, 1/sqrt(mum_prec)) )
+        theta["mu_m"] = rand(Normal( (hyperTheta["mean_mu_m"]*hyperTheta["prec_mu_m"] + sum(theta[mlab])*theta["tau_m"] )/mum_prec, 1/sqrt(mum_prec)) )
         
         # update c_i - the intercept for the control subjects
         for i in 1:nCtrl 
@@ -270,8 +274,9 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
             mu_cCrl = (theta["tau_norm"]*(data_summs["sum_y"][i] - theta[mlab[i]]*data_summs["sum_x"][i]) ) / tau_cCrl
             theta[clab[i]] = rand(Normal( (theta["mu_c"]*theta["tau_c"] + mu_cCrl*tau_cCrl) / (theta["tau_c"] + tau_cCrl), 1/sqrt(theta["tau_c"] + tau_cCrl) ))
         end
+
         # update c_nSbj - the intercept for the patient subject
-        tau_cPat = theta["tau_norm"]*sum(likeCtrl) + hyperTheta["tau_def"]*sum(nlikeCtrl)
+        tau_cPat = theta["tau_norm"]*sum_likeCtrl + hyperTheta["tau_def"]*sum_nlikeCtrl
         mu_cPat = ( theta["tau_norm"]*sum(yPat[likeCtrl] .- theta[mlab[nSbj]] .*xPat[likeCtrl])
                   + hyperTheta["tau_def"]*sum(yPat[nlikeCtrl] .- theta[mlab[nSbj]] .*xPat[nlikeCtrl]) ) / tau_cPat
         
@@ -288,18 +293,18 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
         mu_mPat = ( theta["tau_norm"]*sum(data_summs["xy_pat"][likeCtrl] .- theta[clab[nSbj]] .*xPat[likeCtrl])
                   + hyperTheta["tau_def"]*sum(data_summs["xy_pat"][nlikeCtrl] .- theta[clab[nSbj]] .*xPat[nlikeCtrl]) ) / tau_mPat
         theta[mlab[nSbj]] = rand(Normal( (theta["mu_m"]*theta["tau_m"] + mu_mPat*tau_mPat)/(theta["tau_m"] + tau_mPat), 1/sqrt(theta["tau_m"] + tau_mPat) ) )
-        
+
         # update tau - the error in the control and like-control patient fibres
         sq_diff = 0.0 # calculate the squared difference between the expected expression level and observed expression level
         for i in 1:nCtrl
-            sq_diff += sum( (theta[mlab[i]] .*ctrlMat[ctrlIndex.==i,1] .+ theta[clab[i]] .- ctrlMat[ctrlIndex.==i,2]) .^2 )
+            sq_diff += sum( (theta[mlab[i]] .*ctrlMat[ctrlIndex.==i,1] .+theta[clab[i]] .- ctrlMat[ctrlIndex.==i,2]) .^2 )
         end
         sq_diff += sum( (theta[mlab[nSbj]] .*xPat[likeCtrl] .+ theta[clab[nSbj]] .- yPat[likeCtrl]) .^2)
         # update tau - the model error for like-control patients
-        theta["tau_norm"] = rand(Gamma( hyperTheta["shape_tau"] + 0.5*(sum(nCtrl) + sum(likeCtrl)), 1/(hyperTheta["rate_tau"] + 0.5*sq_diff)))
-        
+        theta["tau_norm"] = rand(Gamma( hyperTheta["shape_tau"] + 0.5*(sum(nFib_ctrl) + sum_likeCtrl), 1 /(hyperTheta["rate_tau"] + 0.5*sq_diff) ) )
+
         # update proportion of deficiency
-        theta["probdiff"] = rand(Beta( hyperTheta["alpha_pi"] + sum(nlikeCtrl), hyperTheta["beta_pi"] + sum(likeCtrl) ) )
+        theta["probdiff"] = rand(Beta( hyperTheta["alpha_pi"] + sum_nlikeCtrl, hyperTheta["beta_pi"] + sum_likeCtrl ) )
         
         # densities for the classification
         denDef = theta["probdiff"] .* pdf.(Normal.(theta[mlab[nSbj]] .*xPat .+ theta[clab[nSbj]], 1/sqrt(hyperTheta["tau_def"]) ), yPat)
@@ -310,8 +315,8 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
         # fibre i is classified as deficient
         classifs = u .<denDef
         
-        likeCtrl = classifs
-        nlikeCtrl = .! classifs
+        likeCtrl = .!classifs
+        nlikeCtrl = classifs
 
         # population densities
         theta["m_pred"] = rand(Normal(theta["mu_m"], 1/sqrt(theta["tau_m"])))
@@ -319,7 +324,7 @@ function gibbs_sampler(dataMats; warmup=20000, iter=1000, thin=1)
     
         if (tt>warmIter) && mod(tt-warmIter,thin)==0 
             post[outCount, paramNames] = theta[paramNames]
-            classifs_mat[outCount,:] = classifs
+            classifs_mat[outCount,:] = nlikeCtrl
             outCount += 1
         end
     end
